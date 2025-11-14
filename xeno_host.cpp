@@ -21,6 +21,9 @@ static bool g_print_disassembly = false;
 static bool g_print_dump_state = false;
 static bool g_print_compiled_code = false;
 
+static const char* bridge_version = "v0.1.3.1";
+static const char* bridge_date = "14.11.2025";
+
 static bool read_exact(std::istream& in, std::string& out, size_t n) {
     out.clear();
     out.resize(n);
@@ -43,15 +46,21 @@ int main() {
     std::atomic<bool> running{true};
     std::atomic<bool> vm_running{false};
 
-    std::ofstream infoFile("xeno_info.txt");
+    std::ofstream infoFile("xeno_info.txt", std::ios::trunc);
     if (infoFile.is_open()) {
         infoFile << "Language: " << (engine.getLanguageName() ? engine.getLanguageName() : "Unknown") << "\n";
         infoFile << "LanguageVersion: " << (engine.getLanguageVersion() ? engine.getLanguageVersion() : "Unknown") << "\n";
         infoFile << "LanguageDate: " << (engine.getLanguageDate() ? engine.getLanguageDate() : "Unknown") << "\n";
-        infoFile << "VMVersion: " << (engine.getVMVersion() ? engine.getVMVersion() : "Unknown") << "\n";
-        infoFile << "VMDate: " << (engine.getVMDate() ? engine.getVMDate() : "Unknown") << "\n";
-        infoFile << "CompilerVersion: " << (engine.getCompilerVersion() ? engine.getCompilerVersion() : "Unknown") << "\n";
-        infoFile << "CompilerDate: " << (engine.getCompilerDate() ? engine.getCompilerDate() : "Unknown") << "\n";
+
+        infoFile << "BridgeVersion: " << bridge_version << "\n";
+        infoFile << "BridgeDate: " << bridge_date << "\n\n";
+
+        infoFile << "[support_api_settings_funcs]\n";
+        infoFile << "SUPPORT_PRINT_COMPILED_CODE\n";
+        infoFile << "SUPPORT_DISASSEMBLE\n";
+        infoFile << "SUPPORT_DUMP_STATE\n";
+        infoFile << "SUPPORT_SET_MAX_INSTRUCTIONS\n";
+
         infoFile.close();
     }
 
@@ -154,56 +163,21 @@ int main() {
                 send_line("Could not retrieve language date");
             }
         }
-        else if (cmd == "GET_VM_VERSION") {
+        else if (cmd == "GET_BRIDGE_VERSION") {
             try {
-                const char* vm_ver = engine.getVMVersion();
-                send_line(std::string("VM version: ") + (vm_ver ? vm_ver : "Unknown"));
+                send_line(std::string("Language version: ") + bridge_version);
             } catch (...) {
-                send_line("Could not retrieve VM version");
+                send_line("Could not retrieve language version");
             }
         }
-        else if (cmd == "GET_VM_DATE") {
+        else if (cmd == "GET_BRIDGE_DATE") {
             try {
-                const char* vm_date = engine.getVMDate();
-                send_line(std::string("VM date: ") + (vm_date ? vm_date : "Unknown"));
+                send_line(std::string("Language date: ") + bridge_date);
             } catch (...) {
-                send_line("Could not retrieve VM date");
+                send_line("Could not retrieve language date");
             }
         }
-        else if (cmd == "GET_COMPILER_VERSION") {
-            try {
-                const char* comp_ver = engine.getCompilerVersion();
-                send_line(std::string("Compiler version: ") + (comp_ver ? comp_ver : "Unknown"));
-            } catch (...) {
-                send_line("Could not retrieve compiler version");
-            }
-        }
-        else if (cmd == "GET_COMPILER_DATE") {
-            try {
-                const char* comp_date = engine.getCompilerDate();
-                send_line(std::string("Compiler date: ") + (comp_date ? comp_date : "Unknown"));
-            } catch (...) {
-                send_line("Could not retrieve compiler date");
-            }
-        }
-        else if (cmd == "GET_VERSION") {
-            try {
-                const char* name = engine.getLanguageName();
-                const char* ver = engine.getLanguageVersion();
-                const char* date = engine.getLanguageDate();
-                const char* vm_ver = engine.getVMVersion();
-                const char* vm_date = engine.getVMDate();
-                const char* comp_ver = engine.getCompilerVersion();
-                const char* comp_date = engine.getCompilerDate();
-                std::string out = "Version Information:\n" +
-                    std::string("  Language: ") + (name ? name : "Unknown") + " "+ (ver ? ver : "Unknown") + " (" + (date ? date : "Unknown") + ")\n" +
-                    "  Virtual Machine: " + (vm_ver ? vm_ver : "Unknown") + " (" + (vm_date ? vm_date : "Unknown") + ")\n" +
-                    "  Compiler: " + (comp_ver ? comp_ver : "Unknown") + " (" + (comp_date ? comp_date : "Unknown") + ")";
-                send_line(out);
-            } catch (...) {
-                send_line("Could not retrieve version information");
-            }
-        }
+
         // Новые команды для вызова методов XenoLanguage напрямую
         else if (cmd == "PRINT_COMPILED_CODE") {
             try {
@@ -269,14 +243,6 @@ int main() {
             } else {
                 send_line("Missing value for max instructions");
             }
-        }
-        else if (cmd == "GET_SETTINGS") {
-            std::string settings = "⚙️  Current Settings:\n" +
-                std::string("  Max Instructions: ") + std::to_string(g_max_instructions) + "\n" +
-                "  Print Disassembly: " + (g_print_disassembly ? "Yes" : "No") + "\n" +
-                "  Print VM State: " + (g_print_dump_state ? "Yes" : "No") + "\n" +
-                "  Print Compiled Code: " + (g_print_compiled_code ? "Yes" : "No");
-            send_line(settings);
         }
         else if (cmd == "EXIT") {
             send_line("Exiting");
