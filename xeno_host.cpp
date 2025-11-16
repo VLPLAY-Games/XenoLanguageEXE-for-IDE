@@ -1,25 +1,21 @@
 // xeno_host.cpp
+// cmake .. -G "Visual Studio 17 2022" -A x64
+// cmake --build . --config Release
+
+
 #include <iostream>
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <thread>
 #include <mutex>
-#include <chrono>
 #include <sstream>
 #include <iomanip>
 #include <exception>
-#include <atomic>
 #include <cstring>
 #include <fstream>
-
 #include "XenoLanguage.h"
 
-// Глобальные настройки
-static uint32_t g_max_instructions = 10000;
-static bool g_print_disassembly = false;
-static bool g_print_dump_state = false;
-static bool g_print_compiled_code = false;
+static uint32_t g_max_instructions = 100000;
 
 static const char* bridge_version = "v0.1.3.1";
 static const char* bridge_date = "14.11.2025";
@@ -46,7 +42,7 @@ int main() {
     std::atomic<bool> running{true};
     std::atomic<bool> vm_running{false};
 
-    std::ofstream infoFile("xeno_info.txt", std::ios::trunc);
+    std::ofstream infoFile("xeno/xeno_info.txt", std::ios::trunc);
     if (infoFile.is_open()) {
         infoFile << "Language: " << (engine.getLanguageName() ? engine.getLanguageName() : "Unknown") << "\n";
         infoFile << "LanguageVersion: " << (engine.getLanguageVersion() ? engine.getLanguageVersion() : "Unknown") << "\n";
@@ -55,7 +51,7 @@ int main() {
         infoFile << "BridgeVersion: " << bridge_version << "\n";
         infoFile << "BridgeDate: " << bridge_date << "\n\n";
 
-        infoFile << "[support_api_settings_funcs]\n";
+        infoFile << "[API_SETTINGS]\n";
         infoFile << "SUPPORT_PRINT_COMPILED_CODE\n";
         infoFile << "SUPPORT_DISASSEMBLE\n";
         infoFile << "SUPPORT_DUMP_STATE\n";
@@ -97,7 +93,6 @@ int main() {
             if (std::cin.peek() == '\n') std::cin.get();
 
             try {
-                // Применяем текущие настройки перед компиляцией
                 engine.setMaxInstructions(g_max_instructions);
                 
                 bool ok = engine.compile(src);
@@ -178,7 +173,6 @@ int main() {
             }
         }
 
-        // Новые команды для вызова методов XenoLanguage напрямую
         else if (cmd == "PRINT_COMPILED_CODE") {
             try {
                 engine.printCompiledCode();
@@ -229,7 +223,6 @@ int main() {
                 send_line("Unknown error while checking VM status");
             }
         }
-        // Команды для настроек
         else if (cmd == "SET_MAX_INSTRUCTIONS") {
             std::string value;
             if (std::getline(std::cin, value)) {
