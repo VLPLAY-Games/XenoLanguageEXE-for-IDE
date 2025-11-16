@@ -13,8 +13,10 @@
 #include <exception>
 #include <cstring>
 #include <fstream>
+#include <filesystem>
 #include "XenoLanguage.h"
 
+namespace fs = std::filesystem;
 static uint32_t g_max_instructions = 100000;
 
 static const char* bridge_version = "v0.1.3.1";
@@ -58,6 +60,16 @@ int main() {
         infoFile << "SUPPORT_SET_MAX_INSTRUCTIONS\n";
 
         infoFile.close();
+        
+        try {
+            fs::permissions("xeno/xeno_info.txt",
+                            fs::perms::owner_read |
+                            fs::perms::group_read |
+                            fs::perms::others_read,
+                            fs::perm_options::replace);
+        } catch (const std::exception& e) {
+            std::cerr << "Failed to set read-only permissions: " << e.what() << std::endl;
+        }
     }
 
     auto send_line = [](const std::string& s) {
