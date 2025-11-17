@@ -502,16 +502,16 @@ uint16_t XenoVM::addString(const String& str) {
     return new_index;
 }
 
-bool XenoVM::isInteger(const String& str) {
-    if (str.isEmpty()) return false;
-    const char* cstr = str.c_str();
-    size_t start = 0;
-    if (cstr[0] == '-') start = 1;
-    for (size_t i = start; i < str.length(); ++i) {
-        if (!isdigit(cstr[i])) return false;
-    }
-    return true;
-}
+// bool XenoVM::isInteger(const String& str) {
+//     if (str.isEmpty()) return false;
+//     const char* cstr = str.c_str();
+//     size_t start = 0;
+//     if (cstr[0] == '-') start = 1;
+//     for (size_t i = start; i < str.length(); ++i) {
+//         if (!isdigit(cstr[i])) return false;
+//     }
+//     return true;
+// }
 
 bool XenoVM::isFloat(const String& str) {
     if (str.isEmpty()) return false;

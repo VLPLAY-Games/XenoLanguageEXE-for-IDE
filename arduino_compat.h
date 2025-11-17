@@ -568,6 +568,36 @@ inline void attachInterrupt(uint8_t interruptNum, void (*userFunc)(void), int mo
 inline void detachInterrupt(uint8_t interruptNum) {
 }
 
+inline bool isInteger(const XenoString& str) {
+    if (str.isEmpty()) return false;
+
+    // Убираем все пробелы
+    XenoString trimmed = str;
+    trimmed.trim();
+    if (trimmed.isEmpty()) return false;
+
+    const char* cstr = trimmed.c_str();
+    size_t len = trimmed.length();
+    size_t start = 0;
+
+    // Разрешаем знак в начале
+    if (cstr[0] == '-' || cstr[0] == '+') {
+        start = 1;
+        if (len == 1) return false; // Только знак без цифр
+    }
+
+    // Проверяем что все символы - цифры
+    for (size_t i = start; i < len; ++i) {
+        if (cstr[i] < '0' || cstr[i] > '9') {
+            return false;
+        }
+    }
+
+    // Простая проверка - если дошли сюда, это целое число
+    return true;
+}
+
+
 // Utility functions
 template<typename T>
 inline T min(T a, T b) {
