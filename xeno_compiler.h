@@ -49,7 +49,7 @@ class XenoCompiler {
     String cleanLine(const String& line);
     int addString(const String& str);
     int getVariableIndex(const String& var_name);
-    // bool isInteger(const String& str);
+    // // bool isInteger(const String& str);
     bool isFloat(const String& str);
     bool isBool(const String& str);
     bool isQuotedString(const String& str);

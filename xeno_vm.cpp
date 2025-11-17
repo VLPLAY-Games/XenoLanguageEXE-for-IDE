@@ -502,7 +502,7 @@ uint16_t XenoVM::addString(const String& str) {
     return new_index;
 }
 
-// bool XenoVM::isInteger(const String& str) {
+// // bool XenoVM::isInteger(const String& str) {
 //     if (str.isEmpty()) return false;
 //     const char* cstr = str.c_str();
 //     size_t start = 0;

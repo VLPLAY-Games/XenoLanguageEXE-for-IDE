@@ -28,6 +28,11 @@ def process_all_files(root_dir):
 
 def process_file(filepath):
     """Process a single file - convert Arduino includes to arduino_compat.h and handle String defines."""
+    # Skip these files completely
+    if filepath.endswith(('arduino_compat.cpp', 'xeno_host.cpp')):
+        print(f"SKIPPED: {filepath}")
+        return True
+        
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -43,6 +48,12 @@ def process_file(filepath):
             r'#include "\2"',
             content
         )
+        
+        # Comment out isInteger functions in specific files
+        if filepath.endswith(('xeno_compiler.h', 'xeno_vm.h')):
+            content = comment_isInteger_declaration(content)
+        elif filepath.endswith(('xeno_compiler.cpp', 'xeno_vm.cpp')):
+            content = comment_isInteger_definition(content)
         
         if filepath.endswith('.h'):
             content = process_header_file(content)
@@ -62,6 +73,57 @@ def process_file(filepath):
     except Exception as e:
         print(f"ERROR: Failed to process {filepath} - {str(e)}")
         return False
+
+def comment_isInteger_declaration(content):
+    """Comment out isInteger function declaration in header files."""
+    # Pattern to find bool isInteger(const String& str);
+    pattern = r'bool\s+isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*;'
+    
+    # Replace with commented version
+    replacement = r'// bool isInteger(const String& str);'
+    content = re.sub(pattern, replacement, content)
+    
+    return content
+
+def comment_isInteger_definition(content):
+    """Comment out isInteger function definition in cpp files."""
+    # Improved patterns to capture the complete function definitions
+    vm_pattern = r'bool\s+XenoVM::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{[^}]+\}'
+    compiler_pattern = r'bool\s+XenoCompiler::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{[^}]+\}[^}]*\}'
+    
+    # More specific patterns that capture everything between the braces
+    vm_complete_pattern = r'(bool\s+XenoVM::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{)(.*?)(\n\s*\})'
+    compiler_complete_pattern = r'(bool\s+XenoCompiler::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{)(.*?)(\n\s*\})'
+    
+    # Try the complete patterns first
+    vm_replacement = '''// bool XenoVM::isInteger(const String& str) {
+//     if (str.isEmpty()) return false;
+//     const char* cstr = str.c_str();
+//     size_t start = 0;
+//     if (cstr[0] == '-') start = 1;
+//     for (size_t i = start; i < str.length(); ++i) {
+//         if (!isdigit(cstr[i])) return false;
+//     }
+//     return true;
+// }'''
+    
+    compiler_replacement = '''// bool XenoCompiler::isInteger(const String& str) {
+//     if (str.isEmpty()) return false;
+//     const char* cstr = str.c_str();
+//     size_t start = 0;
+//     if (cstr[0] == '-') start = 1;
+//     for (size_t i = start; i < str.length(); ++i) {
+//         if (!isdigit(cstr[i])) return false;
+//     }
+//     long long_val = str.toInt();
+//     return !(long_val > 2147483647L || long_val < -2147483648L);
+// }'''
+    
+    # Apply replacements using the complete patterns
+    content = re.sub(compiler_complete_pattern, compiler_replacement, content, flags=re.DOTALL)
+    content = re.sub(vm_complete_pattern, vm_replacement, content, flags=re.DOTALL)
+    
+    return content
 
 def process_header_file(content):
     """Process .h file - add arduino_compat.h include and String defines."""

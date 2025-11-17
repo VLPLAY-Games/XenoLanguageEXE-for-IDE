@@ -74,7 +74,7 @@ class XenoVM {
     XenoValue performAbs(const XenoValue& a);
     bool performComparison(const XenoValue& a, const XenoValue& b, uint8_t op);
     uint16_t addString(const String& str);
-   //  bool isInteger(const String& str);
+    // // bool isInteger(const String& str);
     bool isFloat(const String& str);
     bool isBool(const String& str);
 
