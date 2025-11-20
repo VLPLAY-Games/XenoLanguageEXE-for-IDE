@@ -129,7 +129,6 @@ int main() {
                     send_line("VM already running");
                 } else {
                     vm_running = true;
-
                     {
                         std::lock_guard<std::mutex> lk(vmThreadMutex);
                         if (vmThread.joinable()) {
@@ -150,10 +149,10 @@ int main() {
                                 send_line("Unknown runtime error occurred in VM thread");
                             }
                             vm_running = false;
-                            send_line("VM thread finished");
+                            // send_line("VM thread finished");
                         });
                     }
-                    send_line("VM started (background)");
+                    // send_line("VM started (background)");
                 }
             } catch (const std::exception& ex) {
                 send_line(std::string("Runtime error starting VM: ") + ex.what());
@@ -303,7 +302,6 @@ int main() {
         else if (cmd.rfind("STDIN ", 0) == 0) { // starts_with "STDIN "
             std::string payload = cmd.substr(6); // всё после "STDIN "
             SerialPushInput(payload); // кладём в очередь Serial (см arduino_compat)
-            send_line("STDIN_OK");
         }
         else {
             send_line(std::string("Unknown command: ") + cmd);
