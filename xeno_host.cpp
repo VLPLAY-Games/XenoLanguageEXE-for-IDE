@@ -44,6 +44,10 @@ int main() {
     std::atomic<bool> running{true};
     std::atomic<bool> vm_running{false};
 
+    std::thread vmThread;     // поток для VM
+    std::mutex vmThreadMutex; // защита для vmThread
+
+
     std::ofstream infoFile("xeno/xeno_info.txt", std::ios::trunc);
     if (infoFile.is_open()) {
         infoFile << "Language: " << (engine.getLanguageName() ? engine.getLanguageName() : "Unknown") << "\n";
@@ -121,31 +125,62 @@ int main() {
         }
         else if (cmd == "RUN") {
             try {
-                // Применяем текущие настройки перед запуском
-                engine.setMaxInstructions(g_max_instructions);
-                
-                bool ok = engine.run();
-                if (ok) {
-                    vm_running = true;
-                    send_line("");
+                if (vm_running.load()) {
+                    send_line("VM already running");
                 } else {
-                    send_line("Failed to start virtual machine");
+                    vm_running = true;
+
+                    {
+                        std::lock_guard<std::mutex> lk(vmThreadMutex);
+                        if (vmThread.joinable()) {
+                            try { vmThread.join(); } catch(...) {}
+                        }
+                        // УБРАЛИ &g_max_instructions из списка захвата.
+                        vmThread = std::thread([&engine, &vm_running, &send_line]() {
+                            try {
+                                // глоабльная g_max_instructions доступна здесь без захвата
+                                engine.setMaxInstructions(g_max_instructions);
+                                bool ok = engine.run();
+                                if (!ok) {
+                                    send_line("Failed to start virtual machine");
+                                }
+                            } catch (const std::exception& ex) {
+                                send_line(std::string("Runtime error: ") + ex.what());
+                            } catch (...) {
+                                send_line("Unknown runtime error occurred in VM thread");
+                            }
+                            vm_running = false;
+                            send_line("VM thread finished");
+                        });
+                    }
+                    send_line("VM started (background)");
                 }
             } catch (const std::exception& ex) {
-                send_line(std::string("Runtime error: ") + ex.what());
+                send_line(std::string("Runtime error starting VM: ") + ex.what());
             } catch (...) {
-                send_line("Unknown runtime error occurred");
+                send_line("Unknown runtime error occurred starting VM");
             }
         }
+
         else if (cmd == "STOP") {
             try {
+                // Остановим VM; engine.stop() должен корректно разбудить/прервать engine.run()
                 engine.stop();
                 vm_running = false;
+
+                // Подождём завершения фонового потока
+                {
+                    std::lock_guard<std::mutex> lk(vmThreadMutex);
+                    if (vmThread.joinable()) {
+                        try { vmThread.join(); } catch(...) {}
+                    }
+                }
                 send_line("Virtual machine stopped");
             } catch (...) {
                 send_line("Error while stopping virtual machine");
             }
         }
+
         else if (cmd == "GET_LANGUAGE_NAME") {
             try {
                 const char* name = engine.getLanguageName();
@@ -251,16 +286,37 @@ int main() {
         }
         else if (cmd == "EXIT") {
             send_line("Exiting");
+            // остановим VM, если запущена
+            try {
+                engine.stop();
+            } catch(...) {}
+            // дождёмся потока
+            {
+                std::lock_guard<std::mutex> lk(vmThreadMutex);
+                if (vmThread.joinable()) {
+                    try { vmThread.join(); } catch(...) {}
+                }
+            }
             running = false;
             break;
+        }
+        else if (cmd.rfind("STDIN ", 0) == 0) { // starts_with "STDIN "
+            std::string payload = cmd.substr(6); // всё после "STDIN "
+            SerialPushInput(payload); // кладём в очередь Serial (см arduino_compat)
+            send_line("STDIN_OK");
         }
         else {
             send_line(std::string("Unknown command: ") + cmd);
         }
+
     }
 
-    try {
-        engine.stop();
-    } catch(...) {}
+    try { engine.stop(); } catch(...) {}
+    {
+        std::lock_guard<std::mutex> lk(vmThreadMutex);
+        if (vmThread.joinable()) {
+            try { vmThread.join(); } catch(...) {}
+        }
+    }
     return 0;
 }

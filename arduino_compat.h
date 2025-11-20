@@ -16,6 +16,9 @@
 #include <iomanip>
 #include <limits>
 #include <cstdint>
+#include <mutex>
+#include <condition_variable>
+#include <deque>
 
 // Arduino compatibility layer
 #define HIGH 0x1
@@ -40,6 +43,20 @@ unsigned long millis(void);
 
 // Global output callback for redirecting output
 extern std::function<void(const std::string&)> g_outputCallback;
+
+// Serial input queue (for VM INPUT)
+extern std::deque<std::string> g_serialQueue;
+extern std::mutex g_serialMutex;
+extern std::condition_variable g_serialCv;
+
+// Функция для помещения строки в очередь - inline можно оставить
+inline void SerialPushInput(const std::string& s) {
+    std::lock_guard<std::mutex> lk(g_serialMutex);
+    std::string copy = s;
+    while (!copy.empty() && (copy.back() == '\r' || copy.back() == '\n')) copy.pop_back();
+    g_serialQueue.push_back(copy);
+    g_serialCv.notify_one();
+}
 
 
 class XenoString {
@@ -446,8 +463,37 @@ public:
     void begin(unsigned long) {}
     void end() {}
 
-    int available() { return 0; }
-    XenoString readString() { return ""; }
+    int available() {
+        std::lock_guard<std::mutex> lk(g_serialMutex);
+        if (g_serialQueue.empty()) return 0;
+        return static_cast<int>(g_serialQueue.front().size());
+    }
+
+    XenoString readString() {
+        std::lock_guard<std::mutex> lk(g_serialMutex);
+        if (g_serialQueue.empty()) return XenoString("");
+        std::string s = std::move(g_serialQueue.front());
+        g_serialQueue.pop_front();
+        return XenoString(s);
+    }
+
+    // Blocking read with timeout - if you added it earlier, оставьте её
+    XenoString readStringTimeout(unsigned long timeout_ms) {
+        std::unique_lock<std::mutex> lk(g_serialMutex);
+        if (g_serialQueue.empty()) {
+            if (timeout_ms == 0) {
+                g_serialCv.wait(lk, [] { return !g_serialQueue.empty(); });
+            } else {
+                auto dur = std::chrono::milliseconds(timeout_ms);
+                if (!g_serialCv.wait_for(lk, dur, [] { return !g_serialQueue.empty(); })) {
+                    return XenoString("");
+                }
+            }
+        }
+        std::string s = std::move(g_serialQueue.front());
+        g_serialQueue.pop_front();
+        return XenoString(s);
+    }
 
     // Универсальные методы через шаблоны
     template<typename T>
@@ -456,12 +502,12 @@ public:
         ss << value;
         std::string output = ss.str();
 
-        // Use global callback if set, otherwise fall back to cout
+        // Use global callback if set, otherwise fall back to cout.
         if (g_outputCallback) {
             g_outputCallback(output);
-        }
-        else {
+        } else {
             std::cout << output;
+            std::cout.flush(); // <- важное: сразу сбрасываем буфер stdout
         }
         return output.length();
     }
@@ -469,15 +515,24 @@ public:
     template<typename T>
     size_t println(const T& value) {
         size_t result = print(value);
-        print("\n");
+        // ensuring newline and flush
+        if (g_outputCallback) {
+            g_outputCallback("\n");
+        } else {
+            std::cout << std::endl; // std::endl вставит '\n' и flush
+        }
         return result + 1;
     }
 
-    // Перегрузка для println() без аргументов
+    // println() без аргументов
     size_t println() {
-        return print("\n");
+        if (g_outputCallback) {
+            g_outputCallback("\n");
+        } else {
+            std::cout << std::endl;
+        }
+        return 1;
     }
-
     // Явные специализации для устранения неоднозначности
     size_t print(size_t n) {
         return print(std::to_string(n));
