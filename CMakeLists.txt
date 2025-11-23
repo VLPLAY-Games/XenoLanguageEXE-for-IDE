@@ -13,6 +13,7 @@ set(SOURCES
     xeno_vm.cpp
     XenoLanguage.cpp
     xeno_host.cpp
+    version.rc
 )
 
 add_executable(xeno_host ${SOURCES})

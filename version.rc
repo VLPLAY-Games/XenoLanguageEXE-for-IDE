@@ -1,0 +1,32 @@
+#include <windows.h>
+
+1 VERSIONINFO
+FILEVERSION     0,1,3,1
+PRODUCTVERSION  0,1,3,1
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0
+FILEOS          VOS__WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"    // 04 09 = language (en-US), 04E4 = codepage (Unicode)
+        BEGIN
+            VALUE "FileDescription", "Xeno Language Bridge for XenoIDE\0"
+            VALUE "FileVersion", "0.1.3.1\0"
+            VALUE "InternalName", "xeno_host.exe\0"
+            VALUE "OriginalFilename", "xeno_host.exe\0"
+            VALUE "ProductName", "Xeno Language\0"
+            VALUE "ProductVersion", "0.1.3.1\0"
+            VALUE "CompanyName", "VL_PLAY Games\0"
+            VALUE "LegalCopyright", "VL_PLAY Games\0"
+        END
+    END
+
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04E4
+    END
+END
