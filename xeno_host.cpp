@@ -44,19 +44,15 @@ int main() {
     std::atomic<bool> running{true};
     std::atomic<bool> vm_running{false};
 
-    std::thread vmThread;     // поток для VM
-    std::mutex vmThreadMutex; // защита для vmThread
+    std::thread vmThread;
+    std::mutex vmThreadMutex;
 
 
-    // Получаем путь к директории исполняемого файла
     std::filesystem::path exePath = std::filesystem::current_path() / "xeno";
     std::filesystem::path filePath;
-
-    // Проверяем существует ли папка xeno
     if (std::filesystem::exists(exePath) && std::filesystem::is_directory(exePath)) {
         filePath = exePath / "xeno_info.txt";
     } else {
-        // Если папки нет - создаем файл рядом с исполняемым файлом
         filePath = "xeno_info.txt";
     }
 
