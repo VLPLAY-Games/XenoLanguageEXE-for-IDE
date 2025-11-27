@@ -14,17 +14,28 @@
  * limitations under the License.
  */
 
+#include <vector>
 #include "XenoLanguage.h"
 #define String XenoString
+
+XenoLanguage::XenoLanguage() : compiler(security_config), vm(security_config) {
+}
 
 bool XenoLanguage::compile(const String& source_code) {
     compiler.compile(source_code);
     return true;
 }
 
-bool XenoLanguage::run() {
-    vm.loadProgram(compiler.getBytecode(), compiler.getStringTable());
-    vm.run();
+bool XenoLanguage::run(bool less_output) {
+    vm.loadProgram(compiler.getBytecode(), compiler.getStringTable(), less_output);
+    vm.run(less_output);
+    return true;
+}
+
+bool XenoLanguage::compile_and_run(const String& source_code, bool less_output) {
+    compiler.compile(source_code);
+    vm.loadProgram(compiler.getBytecode(), compiler.getStringTable(), less_output);
+    vm.run(less_output);
     return true;
 }
 
@@ -52,31 +63,72 @@ void XenoLanguage::printCompiledCode() {
     compiler.printCompiledCode();
 }
 
-void XenoLanguage::setMaxInstructions(uint32_t max_instr) {
-    vm.setMaxInstructions(max_instr);
+bool XenoLanguage::setMaxInstructions(uint32_t max_instr) {
+    return security_config.setCurrentMaxInstructions(max_instr);
 }
 
-const char* XenoLanguage::getCompilerVersion() noexcept {
-    return compiler.xeno_compiler_version;
+const XenoSecurityConfig& XenoLanguage::getSecurityConfig() const {
+    return security_config;
 }
 
-const char* XenoLanguage::getCompilerDate() noexcept {
-    return compiler.xeno_compiler_date;
+bool XenoLanguage::setStringLimit(uint16_t length) {
+    return security_config.setMaxStringLength(length);
 }
 
-const char* XenoLanguage::getCompilerName() noexcept {
-    return compiler.xeno_compiler_name;
+bool XenoLanguage::setVariableNameLimit(uint16_t length) {
+    return security_config.setMaxVariableNameLength(length);
 }
 
-const char* XenoLanguage::getVMVersion() noexcept {
-    return vm.xeno_vm_version;
+bool XenoLanguage::setExpressionDepth(uint16_t depth) {
+    return security_config.setMaxExpressionDepth(depth);
 }
 
-const char* XenoLanguage::getVMDate() noexcept {
-    return vm.xeno_vm_date;
+bool XenoLanguage::setLoopDepth(uint16_t depth) {
+    return security_config.setMaxLoopDepth(depth);
 }
 
-const char* XenoLanguage::getVMName() noexcept {
-    return vm.xeno_vm_name;
+bool XenoLanguage::setIfDepth(uint16_t depth) {
+    return security_config.setMaxIfDepth(depth);
+}
+
+bool XenoLanguage::setStackSize(uint16_t size) {
+    return security_config.setMaxStackSize(size);
+}
+
+bool XenoLanguage::setAllowedPins(const std::vector<uint8_t>& pins) {
+    return security_config.setAllowedPins(pins);
+}
+
+bool XenoLanguage::addAllowedPin(uint8_t pin) {
+    std::vector<uint8_t> current_pins = security_config.getAllowedPins();
+
+    for (uint8_t existing_pin : current_pins) {
+        if (existing_pin == pin) {
+            return true;
+        }
+    }
+
+    current_pins.push_back(pin);
+    return security_config.setAllowedPins(current_pins);
+}
+
+bool XenoLanguage::removeAllowedPin(uint8_t pin) {
+    std::vector<uint8_t> current_pins = security_config.getAllowedPins();
+
+    for (auto it = current_pins.begin(); it != current_pins.end(); ++it) {
+        if (*it == pin) {
+            current_pins.erase(it);
+            return security_config.setAllowedPins(current_pins);
+        }
+    }
+    return false;
+}
+
+bool XenoLanguage::validateSecurityConfig() const {
+    return security_config.validateConfig();
+}
+
+String XenoLanguage::getSecurityLimitsInfo() const {
+    return security_config.getSecurityLimitsInfo();
 }
 #undef String

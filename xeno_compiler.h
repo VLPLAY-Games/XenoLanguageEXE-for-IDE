@@ -34,6 +34,8 @@ class XenoCompiler {
     std::map<String, XenoValue> variable_map;
     std::vector<int> if_stack;
     std::vector<LoopInfo> loop_stack;
+    XenoSecurityConfig& security_config;
+    XenoSecurity security;
 
     struct Constant {
         const char* name;
@@ -41,6 +43,28 @@ class XenoCompiler {
     };
     static const Constant constants[];
     static const size_t constants_count;
+
+    struct FunctionInfo {
+        const char* name;
+        char open_bracket;
+        char close_bracket;
+        uint8_t opcode;
+        int num_args;
+    };
+
+    static const FunctionInfo math_functions[];
+    static const size_t math_functions_count;
+
+    void compileMathFunction(const String& token, const FunctionInfo& func);
+    void compileSimpleCommand(const String& command, uint8_t opcode);
+
+    struct SimpleCommand {
+        const char* name;
+        uint8_t opcode;
+    };
+
+    static const SimpleCommand simple_commands[];
+    static const size_t simple_commands_count;
 
     friend class XenoLanguage;
 
@@ -71,13 +95,8 @@ class XenoCompiler {
     void compileLine(const String& line, int line_number);
     void processConstants(String& expr);
 
-
  protected:
-    static constexpr const char* xeno_compiler_name = "Xeno Compiler";
-    static constexpr const char* xeno_compiler_version = "v0.1.3";
-    static constexpr const char* xeno_compiler_date = "08.11.2025";
-
-    XenoCompiler();
+    explicit XenoCompiler(XenoSecurityConfig& config);
     void compile(const String& source_code);
     const std::vector<XenoInstruction>& getBytecode() const;
     const std::vector<String>& getStringTable() const;

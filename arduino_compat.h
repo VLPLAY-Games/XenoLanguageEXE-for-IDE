@@ -340,6 +340,11 @@ public:
     XenoString& operator+=(const XenoString& s) { str += s.str; return *this; }
     XenoString& operator+=(const char* s) { str += (s ? s : ""); return *this; }
     XenoString& operator+=(char c) { str += c; return *this; }
+    XenoString& operator+=(uint8_t n) { str += std::to_string(n); return *this; }
+    XenoString& operator+=(int16_t n) { str += std::to_string(n); return *this; }
+    XenoString& operator+=(uint16_t n) { str += std::to_string(n); return *this; }
+    XenoString& operator+=(int32_t n) { str += std::to_string(n); return *this; }
+    XenoString& operator+=(uint32_t n) { str += std::to_string(n); return *this; }
 
     XenoString& concat(const XenoString& s) { return *this += s; }
     XenoString& concat(const char* s) { return *this += s; }
@@ -554,6 +559,7 @@ public:
         ss << std::fixed << std::setprecision(precision) << n;
         return println(ss.str());
     }
+    
 };
 
 // Объявляем Serial как extern, а определение будет в одном .cpp файле

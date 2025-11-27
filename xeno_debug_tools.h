@@ -14,32 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef SRC_XENO_XENO_SECURITY_H_
-#define SRC_XENO_XENO_SECURITY_H_
+
+#ifndef SRC_XENO_DEBUG_H_
+#define SRC_XENO_DEBUG_H_
 
 #include <vector>
 #include "xeno_common.h"
-#include "xeno_security_config.h"
 #include "arduino_compat.h"
 #define String XenoString
 
 
-class XenoSecurity {
- private:
-    XenoSecurityConfig& config;
-
+class Debugger {
  protected:
-    friend class XenoSecurity;
-    friend class XenoLanguage;
     friend class XenoCompiler;
     friend class XenoVM;
-    explicit XenoSecurity(XenoSecurityConfig& cfg) : config(cfg) {}
+    static void disassemble(const std::vector<XenoInstruction>& instructions,
+                          const std::vector<String>& string_table,
+                          const String& title = "Disassembly",
+                          bool show_string_table = false);
 
-    bool isPinAllowed(uint8_t pin);
-    String sanitizeString(const String& input);
-    bool verifyBytecode(const std::vector<XenoInstruction>& bytecode,
-                       const std::vector<String>& strings);
+ private:
+    static void printInstruction(size_t index, const XenoInstruction& instr,
+                               const std::vector<String>& string_table);
+
+    static void printStringArg(uint32_t arg, const std::vector<String>& string_table, bool quoted = true);
 };
 
 #undef String
-#endif  // SRC_XENO_XENO_SECURITY_H_
+#endif

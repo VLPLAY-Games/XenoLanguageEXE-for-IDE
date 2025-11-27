@@ -19,8 +19,8 @@
 namespace fs = std::filesystem;
 static uint32_t g_max_instructions = 100000;
 
-static const char* bridge_version = "v0.1.3.1";
-static const char* bridge_date = "14.11.2025";
+static const char* bridge_version = "v0.1.4.1";
+static const char* bridge_date = "27.11.2025";
 
 static bool read_exact(std::istream& in, std::string& out, size_t n) {
     out.clear();

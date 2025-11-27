@@ -22,6 +22,7 @@
 #include <stack>
 #include "xeno_common.h"
 #include "xeno_security.h"
+#include "xeno_security_config.h"
 #include "arduino_compat.h"
 #define String XenoString
 
@@ -32,8 +33,11 @@ class XenoVM {
     std::vector<String> string_table;
     std::map<String, uint16_t> string_lookup;
     uint32_t program_counter;
-    XenoValue stack[MAX_STACK_SIZE];
+
+    XenoValue* stack;
     uint32_t stack_pointer;
+    const uint32_t max_stack_size;
+
     std::map<String, XenoValue> variables;
     bool running;
     uint32_t instruction_count;
@@ -41,6 +45,7 @@ class XenoVM {
     uint32_t iteration_count;
     static const uint32_t MAX_ITERATIONS = 100000;
     XenoSecurity security;
+    XenoSecurityConfig& security_config;
 
     friend class XenoLanguage;
 
@@ -77,7 +82,6 @@ class XenoVM {
     // // bool isInteger(const String& str);
     bool isFloat(const String& str);
     bool isBool(const String& str);
-
     void handleNOP(const XenoInstruction& instr);
     void handlePRINT(const XenoInstruction& instr);
     void handleLED_ON(const XenoInstruction& instr);
@@ -88,16 +92,6 @@ class XenoVM {
     void handlePUSH_BOOL(const XenoInstruction& instr);
     void handlePUSH_STRING(const XenoInstruction& instr);
     void handlePOP(const XenoInstruction& instr);
-    void handleADD(const XenoInstruction& instr);
-    void handleSUB(const XenoInstruction& instr);
-    void handleMUL(const XenoInstruction& instr);
-    void handleDIV(const XenoInstruction& instr);
-    void handleMOD(const XenoInstruction& instr);
-    void handleABS(const XenoInstruction& instr);
-    void handlePOW(const XenoInstruction& instr);
-    void handleMAX(const XenoInstruction& instr);
-    void handleMIN(const XenoInstruction& instr);
-    void handleSQRT(const XenoInstruction& instr);
     void handleINPUT(const XenoInstruction& instr);
     void handleEQ(const XenoInstruction& instr);
     void handleNEQ(const XenoInstruction& instr);
@@ -110,22 +104,20 @@ class XenoVM {
     void handleLOAD(const XenoInstruction& instr);
     void handleJUMP(const XenoInstruction& instr);
     void handleJUMP_IF(const XenoInstruction& instr);
-    void handleSIN(const XenoInstruction& instr);
-    void handleCOS(const XenoInstruction& instr);
-    void handleTAN(const XenoInstruction& instr);
+    void handleUNARY_MATH(const XenoInstruction& instr);
     void handleHALT(const XenoInstruction& instr);
+    void handleBINARY_OP(const XenoInstruction& instr);
+    void handleComparisonOp(const XenoInstruction& instr, uint8_t op);
+    void handlePushOp(const XenoInstruction& instr, XenoDataType type);
 
  protected:
-    static constexpr const char* xeno_vm_name = "Xeno Virtual Machine";
-    static constexpr const char* xeno_vm_version = "v0.1.3";
-    static constexpr const char* xeno_vm_date = "08.11.2025";
-
-    XenoVM();
+    explicit XenoVM(XenoSecurityConfig& config);
+    ~XenoVM();
     void setMaxInstructions(uint32_t max_instr);
     void loadProgram(const std::vector<XenoInstruction>& bytecode,
-                    const std::vector<String>& strings);
+                    const std::vector<String>& strings, bool less_output = true);
     bool step();
-    void run();
+    void run(bool less_output = true);
     void stop();
     bool isRunning() const;
     uint32_t getPC() const;

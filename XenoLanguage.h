@@ -17,54 +17,85 @@
 #ifndef SRC_XENOLANGUAGE_H_
 #define SRC_XENOLANGUAGE_H_
 
+#include <vector>
 #include "xeno_compiler.h"
 #include "xeno_vm.h"
+#include "xeno_security_config.h"
 #include "arduino_compat.h"
 #define String XenoString
 
 
 class XenoLanguage {
  private:
-    static constexpr const char* xeno_language_version = "v0.1.3";
-    static constexpr const char* xeno_language_date = "08.11.2025";
+    static constexpr const char* xeno_language_version = "v0.1.4";
+    static constexpr const char* xeno_language_date = "27.11.2025";
     static constexpr const char* xeno_language_name = "Xeno Language";
 
+    XenoSecurityConfig security_config;
     XenoCompiler compiler;
     XenoVM vm;
 
  public:
+    XenoLanguage();
+
     bool compile(const String& source_code);
-    bool run();
+    bool run(bool less_output = true);
     void step();
     void stop();
     bool isRunning() const;
     void dumpState();
     void disassemble();
     void printCompiledCode();
-    void setMaxInstructions(uint32_t max_instr);
 
-    // Information about language
-    static constexpr const char* getLanguageVersion() noexcept {
-        return xeno_language_version;
-    }
+    bool compile_and_run(const String& source_code, bool less_output = true);
 
-    static constexpr const char* getLanguageDate() noexcept {
-        return xeno_language_date;
-    }
+    bool setMaxInstructions(uint32_t max_instr);
 
-    static constexpr const char* getLanguageName() noexcept {
-        return xeno_language_name;
-    }
+    const XenoSecurityConfig& getSecurityConfig() const;
 
-    // Information about language Compiler
-    const char* getCompilerVersion() noexcept;
-    const char* getCompilerDate() noexcept;
-    const char* getCompilerName() noexcept;
+    bool setStringLimit(uint16_t length);
+    bool setVariableNameLimit(uint16_t length);
+    bool setExpressionDepth(uint16_t depth);
+    bool setLoopDepth(uint16_t depth);
+    bool setIfDepth(uint16_t depth);
+    bool setStackSize(uint16_t size);
+    bool setAllowedPins(const std::vector<uint8_t>& pins);
+    bool addAllowedPin(uint8_t pin);
+    bool removeAllowedPin(uint8_t pin);
 
-    // Information about language VM
-    const char* getVMVersion() noexcept;
-    const char* getVMDate() noexcept;
-    const char* getVMName() noexcept;
+    bool validateSecurityConfig() const;
+
+    String getSecurityLimitsInfo() const;
+
+    uint16_t getMaxStringLength() const { return security_config.getMaxStringLength(); }
+    uint16_t getMaxVariableNameLength() const { return security_config.getMaxVariableNameLength(); }
+    uint16_t getMaxExpressionDepth() const { return security_config.getMaxExpressionDepth(); }
+    uint16_t getMaxLoopDepth() const { return security_config.getMaxLoopDepth(); }
+    uint16_t getMaxIfDepth() const { return security_config.getMaxIfDepth(); }
+    uint16_t getMaxStackSize() const { return security_config.getMaxStackSize(); }
+    uint32_t getCurrentMaxInstructions() const { return security_config.getCurrentMaxInstructions(); }
+    const std::vector<uint8_t>& getAllowedPins() const { return security_config.getAllowedPins(); }
+
+    static constexpr uint16_t getMinStringLength() { return XenoSecurityConfig::getMinStringLength(); }
+    static constexpr uint16_t getMaxStringLengthLimit() { return XenoSecurityConfig::getMaxStringLengthLimit(); }
+    static constexpr uint16_t getMinVariableNameLength() { return XenoSecurityConfig::getMinVariableNameLength(); }
+    static constexpr uint16_t getMaxVariableNameLengthLimit() { return XenoSecurityConfig::getMaxVariableNameLengthLimit(); }
+    static constexpr uint16_t getMinExpressionDepth() { return XenoSecurityConfig::getMinExpressionDepth(); }
+    static constexpr uint16_t getMaxExpressionDepthLimit() { return XenoSecurityConfig::getMaxExpressionDepthLimit(); }
+    static constexpr uint16_t getMinLoopDepth() { return XenoSecurityConfig::getMinLoopDepth(); }
+    static constexpr uint16_t getMaxLoopDepthLimit() { return XenoSecurityConfig::getMaxLoopDepthLimit(); }
+    static constexpr uint16_t getMinIfDepth() { return XenoSecurityConfig::getMinIfDepth(); }
+    static constexpr uint16_t getMaxIfDepthLimit() { return XenoSecurityConfig::getMaxIfDepthLimit(); }
+    static constexpr uint16_t getMinStackSize() { return XenoSecurityConfig::getMinStackSize(); }
+    static constexpr uint16_t getMaxStackSizeLimit() { return XenoSecurityConfig::getMaxStackSizeLimit(); }
+    static constexpr uint32_t getMinInstructionsLimit() { return XenoSecurityConfig::getMinInstructionsLimit(); }
+    static constexpr uint32_t getMaxInstructionsLimitValue() { return XenoSecurityConfig::getMaxInstructionsLimitValue(); }
+    static constexpr uint8_t getMinPinNumber() { return XenoSecurityConfig::getMinPinNumber(); }
+    static constexpr uint8_t getMaxPinNumber() { return XenoSecurityConfig::getMaxPinNumber(); }
+
+    static constexpr const char* getLanguageVersion() noexcept { return xeno_language_version; }
+    static constexpr const char* getLanguageDate() noexcept { return xeno_language_date; }
+    static constexpr const char* getLanguageName() noexcept { return xeno_language_name; }
 };
 
 #undef String

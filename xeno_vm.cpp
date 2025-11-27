@@ -18,6 +18,7 @@
 #include <limits>
 #include <vector>
 #include "xeno_vm.h"
+#include "xeno_debug_tools.h"
 #define String XenoString
 
 void XenoVM::initializeDispatchTable() {
@@ -32,24 +33,24 @@ void XenoVM::initializeDispatchTable() {
     dispatch_table[OP_DELAY] = &XenoVM::handleDELAY;
     dispatch_table[OP_PUSH] = &XenoVM::handlePUSH;
     dispatch_table[OP_POP] = &XenoVM::handlePOP;
-    dispatch_table[OP_ADD] = &XenoVM::handleADD;
-    dispatch_table[OP_SUB] = &XenoVM::handleSUB;
-    dispatch_table[OP_MUL] = &XenoVM::handleMUL;
-    dispatch_table[OP_DIV] = &XenoVM::handleDIV;
+    dispatch_table[OP_ADD] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_SUB] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_MUL] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_DIV] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_MOD] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_POW] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_MAX] = &XenoVM::handleBINARY_OP;
+    dispatch_table[OP_MIN] = &XenoVM::handleBINARY_OP;
     dispatch_table[OP_JUMP] = &XenoVM::handleJUMP;
     dispatch_table[OP_JUMP_IF] = &XenoVM::handleJUMP_IF;
     dispatch_table[OP_PRINT_NUM] = &XenoVM::handlePRINT_NUM;
     dispatch_table[OP_STORE] = &XenoVM::handleSTORE;
     dispatch_table[OP_LOAD] = &XenoVM::handleLOAD;
-    dispatch_table[OP_MOD] = &XenoVM::handleMOD;
-    dispatch_table[OP_ABS] = &XenoVM::handleABS;
-    dispatch_table[OP_POW] = &XenoVM::handlePOW;
-    dispatch_table[OP_MAX] = &XenoVM::handleMAX;
-    dispatch_table[OP_MIN] = &XenoVM::handleMIN;
-    dispatch_table[OP_SQRT] = &XenoVM::handleSQRT;
-    dispatch_table[OP_SIN] = &XenoVM::handleSIN;
-    dispatch_table[OP_COS] = &XenoVM::handleCOS;
-    dispatch_table[OP_TAN] = &XenoVM::handleTAN;
+    dispatch_table[OP_ABS] = &XenoVM::handleUNARY_MATH;
+    dispatch_table[OP_SQRT] = &XenoVM::handleUNARY_MATH;
+    dispatch_table[OP_SIN] = &XenoVM::handleUNARY_MATH;
+    dispatch_table[OP_COS] = &XenoVM::handleUNARY_MATH;
+    dispatch_table[OP_TAN] = &XenoVM::handleUNARY_MATH;
     dispatch_table[OP_INPUT] = &XenoVM::handleINPUT;
     dispatch_table[OP_EQ] = &XenoVM::handleEQ;
     dispatch_table[OP_NEQ] = &XenoVM::handleNEQ;
@@ -69,8 +70,7 @@ void XenoVM::resetState() {
     running = false;
     instruction_count = 0;
     iteration_count = 0;
-    max_instructions = 10000;
-    memset(stack, 0, sizeof(stack));
+    max_instructions = security_config.getCurrentMaxInstructions();
     variables.clear();
     string_lookup.clear();
 }
@@ -95,7 +95,7 @@ float XenoVM::toFloat(const XenoValue& v) {
 }
 
 bool XenoVM::Push(const XenoValue& value) {
-    if (stack_pointer >= MAX_STACK_SIZE) {
+    if (stack_pointer >= max_stack_size) {
         Serial.println("CRITICAL ERROR: Stack overflow - terminating execution");
         running = false;
         return false;
@@ -413,67 +413,79 @@ bool XenoVM::performComparison(const XenoValue& a, const XenoValue& b, uint8_t o
             float b_val = toFloat(b);
 
             switch (op) {
-                case OP_EQ: return a_val == b_val;
+                case OP_EQ:  return a_val == b_val;
                 case OP_NEQ: return a_val != b_val;
-                case OP_LT: return a_val < b_val;
-                case OP_GT: return a_val > b_val;
+                case OP_LT:  return a_val < b_val;
+                case OP_GT:  return a_val > b_val;
                 case OP_LTE: return a_val <= b_val;
                 case OP_GTE: return a_val >= b_val;
+                default:     return false;
             }
         }
-        return false;
+        switch (op) {
+            case OP_EQ:  return false;
+            case OP_NEQ: return true;
+            default:     return false;
+        }
     }
 
     switch (a.type) {
         case TYPE_INT:
             switch (op) {
-                case OP_EQ: return a.int_val == b.int_val;
+                case OP_EQ:  return a.int_val == b.int_val;
                 case OP_NEQ: return a.int_val != b.int_val;
-                case OP_LT: return a.int_val < b.int_val;
-                case OP_GT: return a.int_val > b.int_val;
+                case OP_LT:  return a.int_val < b.int_val;
+                case OP_GT:  return a.int_val > b.int_val;
                 case OP_LTE: return a.int_val <= b.int_val;
                 case OP_GTE: return a.int_val >= b.int_val;
+                default:     return false;
             }
             break;
 
         case TYPE_FLOAT:
             switch (op) {
-                case OP_EQ: return a.float_val == b.float_val;
-                case OP_NEQ: return a.float_val != b.float_val;
-                case OP_LT: return a.float_val < b.float_val;
-                case OP_GT: return a.float_val > b.float_val;
+                case OP_EQ:  return fabs(a.float_val - b.float_val) < 0.0001f;
+                case OP_NEQ: return fabs(a.float_val - b.float_val) >= 0.0001f;
+                case OP_LT:  return a.float_val < b.float_val;
+                case OP_GT:  return a.float_val > b.float_val;
                 case OP_LTE: return a.float_val <= b.float_val;
                 case OP_GTE: return a.float_val >= b.float_val;
+                default:     return false;
             }
             break;
 
-        case TYPE_STRING:
-            {
-                const String& str_a = string_table[a.string_index];
-                const String& str_b = string_table[b.string_index];
-                switch (op) {
-                    case OP_EQ: return str_a == str_b;
-                    case OP_NEQ: return str_a != str_b;
-                    case OP_LT: return str_a < str_b;
-                    case OP_GT: return str_a > str_b;
-                    case OP_LTE: return str_a <= str_b;
-                    case OP_GTE: return str_a >= str_b;
-                }
+        case TYPE_STRING: {
+            const String& str_a = string_table[a.string_index];
+            const String& str_b = string_table[b.string_index];
+            int comparison = str_a.compareTo(str_b);
+
+            switch (op) {
+                case OP_EQ:  return comparison == 0;
+                case OP_NEQ: return comparison != 0;
+                case OP_LT:  return comparison < 0;
+                case OP_GT:  return comparison > 0;
+                case OP_LTE: return comparison <= 0;
+                case OP_GTE: return comparison >= 0;
+                default:     return false;
             }
             break;
+        }
 
         case TYPE_BOOL:
             switch (op) {
-                case OP_EQ: return a.bool_val == b.bool_val;
+                case OP_EQ:  return a.bool_val == b.bool_val;
                 case OP_NEQ: return a.bool_val != b.bool_val;
-                case OP_LT: return a.bool_val < b.bool_val;
-                case OP_GT: return a.bool_val > b.bool_val;
+                case OP_LT:  return a.bool_val < b.bool_val;
+                case OP_GT:  return a.bool_val > b.bool_val;
                 case OP_LTE: return a.bool_val <= b.bool_val;
                 case OP_GTE: return a.bool_val >= b.bool_val;
+                default:     return false;
             }
             break;
+
+        default:
+            return false;
     }
-    return false;
 }
 
 uint16_t XenoVM::addString(const String& str) {
@@ -572,110 +584,108 @@ void XenoVM::handleDELAY(const XenoInstruction& instr) {
     delay(instr.arg1);
 }
 
-void XenoVM::handlePUSH(const XenoInstruction& instr) {
-    if (!Push(XenoValue::makeInt(instr.arg1))) return;
+void XenoVM::handlePushOp(const XenoInstruction& instr, XenoDataType type) {
+    XenoValue value;
+
+    switch (type) {
+        case TYPE_INT:
+            value = XenoValue::makeInt(instr.arg1);
+            break;
+        case TYPE_FLOAT: {
+            float fval;
+            memcpy(&fval, &instr.arg1, sizeof(float));
+            value = XenoValue::makeFloat(fval);
+            break;
+        }
+        case TYPE_STRING:
+            value = XenoValue::makeString(instr.arg1);
+            break;
+        case TYPE_BOOL:
+            value = XenoValue::makeBool(instr.arg1);
+            break;
+        default:
+            return;
+    }
+
+    if (!Push(value)) return;
 }
 
-void XenoVM::handlePUSH_FLOAT(const XenoInstruction& instr) {
-    float fval;
-    memcpy(&fval, &instr.arg1, sizeof(float));
-    if (!Push(XenoValue::makeFloat(fval))) return;
-}
-
-void XenoVM::handlePUSH_BOOL(const XenoInstruction& instr) {
-    if (!Push(XenoValue::makeBool(instr.arg1))) return;
-}
-
-void XenoVM::handlePUSH_STRING(const XenoInstruction& instr) {
-    if (!Push(XenoValue::makeString(instr.arg1))) return;
-}
+void XenoVM::handlePUSH(const XenoInstruction& instr) { handlePushOp(instr, TYPE_INT); }
+void XenoVM::handlePUSH_FLOAT(const XenoInstruction& instr) { handlePushOp(instr, TYPE_FLOAT); }
+void XenoVM::handlePUSH_STRING(const XenoInstruction& instr) { handlePushOp(instr, TYPE_STRING); }
+void XenoVM::handlePUSH_BOOL(const XenoInstruction& instr) { handlePushOp(instr, TYPE_BOOL); }
 
 void XenoVM::handlePOP(const XenoInstruction& instr) {
     XenoValue temp;
     if (!Pop(temp)) return;
 }
 
-void XenoVM::handleADD(const XenoInstruction& instr) {
+void XenoVM::handleBINARY_OP(const XenoInstruction& instr) {
     XenoValue a, b;
     if (!PopTwo(a, b)) return;
-    if (!Push(performAddition(a, b))) return;
+
+    XenoValue result;
+
+    switch (instr.opcode) {
+        case OP_ADD:
+            result = performAddition(a, b);
+            break;
+        case OP_SUB:
+            result = performSubtraction(a, b);
+            break;
+        case OP_MUL:
+            result = performMultiplication(a, b);
+            break;
+        case OP_DIV:
+            result = performDivision(a, b);
+            break;
+        case OP_MOD:
+            result = performModulo(a, b);
+            break;
+        case OP_POW:
+            result = performPower(a, b);
+            break;
+        case OP_MAX:
+            result = Max(a, b);
+            break;
+        case OP_MIN:
+            result = Min(a, b);
+            break;
+        default:
+            return;
+    }
+
+    if (!Push(result)) return;
 }
 
-void XenoVM::handleSUB(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(performSubtraction(a, b))) return;
-}
-
-void XenoVM::handleMUL(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(performMultiplication(a, b))) return;
-}
-
-void XenoVM::handleDIV(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(performDivision(a, b))) return;
-}
-
-void XenoVM::handleMOD(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(performModulo(a, b))) return;
-}
-
-void XenoVM::handleABS(const XenoInstruction& instr) {
+void XenoVM::handleUNARY_MATH(const XenoInstruction& instr) {
     XenoValue a;
     if (!Peek(a)) return;
-    stack[stack_pointer - 1] = performAbs(a);
-}
 
-void XenoVM::handlePOW(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(performPower(a, b))) return;
-}
+    XenoValue result;
 
-void XenoVM::handleMAX(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(Max(a, b))) return;
-}
+    switch (instr.opcode) {
+        case OP_ABS:
+            result = performAbs(a);
+            break;
+        case OP_SQRT:
+            result = Sqrt(a);
+            break;
+        case OP_SIN:
+            result = XenoValue::makeFloat(sin(toFloat(a)));
+            break;
+        case OP_COS:
+            result = XenoValue::makeFloat(cos(toFloat(a)));
+            break;
+        case OP_TAN:
+            result = XenoValue::makeFloat(tan(toFloat(a)));
+            break;
+        default:
+            return;
+    }
 
-void XenoVM::handleMIN(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(Min(a, b))) return;
+    stack[stack_pointer - 1] = result;
 }
-
-void XenoVM::handleSQRT(const XenoInstruction& instr) {
-    XenoValue a;
-    if (!Peek(a)) return;
-    stack[stack_pointer - 1] = Sqrt(a);
-}
-
-void XenoVM::handleSIN(const XenoInstruction& instr) {
-    XenoValue a;
-    if (!Peek(a)) return;
-    float val = toFloat(a);
-    stack[stack_pointer - 1] = XenoValue::makeFloat(sin(val));
-}
-
-void XenoVM::handleCOS(const XenoInstruction& instr) {
-    XenoValue a;
-    if (!Peek(a)) return;
-    float val = toFloat(a);
-    stack[stack_pointer - 1] = XenoValue::makeFloat(cos(val));
-}
-
-void XenoVM::handleTAN(const XenoInstruction& instr) {
-    XenoValue a;
-    if (!Peek(a)) return;
-    float val = toFloat(a);
-    stack[stack_pointer - 1] = XenoValue::makeFloat(tan(val));
-}
-
 
 void XenoVM::handleINPUT(const XenoInstruction& instr) {
     if (instr.arg1 >= string_table.size()) {
@@ -723,42 +733,20 @@ void XenoVM::handleINPUT(const XenoInstruction& instr) {
     Serial.println(input_str);
 }
 
-
-void XenoVM::handleEQ(const XenoInstruction& instr) {
+void XenoVM::handleComparisonOp(const XenoInstruction& instr, uint8_t op) {
     XenoValue a, b;
     if (!PopTwo(a, b)) return;
-    if (!Push(XenoValue::makeInt(performComparison(a, b, OP_EQ) ? 0 : 1))) return;
+
+    bool result = performComparison(a, b, op);
+    if (!Push(XenoValue::makeInt(result ? 0 : 1))) return;
 }
 
-void XenoVM::handleNEQ(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(XenoValue::makeInt(performComparison(a, b, OP_NEQ) ? 0 : 1))) return;
-}
-
-void XenoVM::handleLT(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(XenoValue::makeInt(performComparison(a, b, OP_LT) ? 0 : 1))) return;
-}
-
-void XenoVM::handleGT(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(XenoValue::makeInt(performComparison(a, b, OP_GT) ? 0 : 1))) return;
-}
-
-void XenoVM::handleLTE(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(XenoValue::makeInt(performComparison(a, b, OP_LTE) ? 0 : 1))) return;
-}
-
-void XenoVM::handleGTE(const XenoInstruction& instr) {
-    XenoValue a, b;
-    if (!PopTwo(a, b)) return;
-    if (!Push(XenoValue::makeInt(performComparison(a, b, OP_GTE) ? 0 : 1))) return;
-}
+void XenoVM::handleEQ(const XenoInstruction& instr) { handleComparisonOp(instr, OP_EQ); }
+void XenoVM::handleNEQ(const XenoInstruction& instr) { handleComparisonOp(instr, OP_NEQ); }
+void XenoVM::handleLT(const XenoInstruction& instr) { handleComparisonOp(instr, OP_LT); }
+void XenoVM::handleGT(const XenoInstruction& instr) { handleComparisonOp(instr, OP_GT); }
+void XenoVM::handleLTE(const XenoInstruction& instr) { handleComparisonOp(instr, OP_LTE); }
+void XenoVM::handleGTE(const XenoInstruction& instr) { handleComparisonOp(instr, OP_GTE); }
 
 void XenoVM::handlePRINT_NUM(const XenoInstruction& instr) {
     XenoValue val;
@@ -831,19 +819,41 @@ void XenoVM::handleHALT(const XenoInstruction& instr) {
     running = false;
 }
 
-XenoVM::XenoVM() {
+XenoVM::XenoVM(XenoSecurityConfig& config)
+    : security_config(config),
+      security(config),
+      max_stack_size(config.getMaxStackSize()) {
     initializeDispatchTable();
+
+    stack = new XenoValue[max_stack_size];
+
     resetState();
     program.reserve(128);
     string_table.reserve(32);
 }
 
+// Деструктор
+XenoVM::~XenoVM() {
+    delete[] stack;
+}
+
+
 void XenoVM::setMaxInstructions(uint32_t max_instr) {
-    max_instructions = max_instr;
+    if (max_instr < security_config.getMinInstructionsLimit()) {
+        max_instructions = security_config.getMinInstructionsLimit();
+        Serial.print("WARNING: max_instructions set to minimum: ");
+        Serial.println(security_config.getMinInstructionsLimit());
+    } else if (max_instr > security_config.getMaxInstructionsLimitValue()) {
+        max_instructions = security_config.getMaxInstructionsLimitValue();
+        Serial.print("WARNING: max_instructions set to maximum: ");
+        Serial.println(security_config.getMaxInstructionsLimitValue());
+    } else {
+        max_instructions = max_instr;
+    }
 }
 
 void XenoVM::loadProgram(const std::vector<XenoInstruction>& bytecode,
-                        const std::vector<String>& strings) {
+                        const std::vector<String>& strings, bool less_output) {
     resetState();
 
     std::vector<String> sanitized_strings;
@@ -866,7 +876,7 @@ void XenoVM::loadProgram(const std::vector<XenoInstruction>& bytecode,
     }
 
     running = true;
-    Serial.println("Program loaded and verified successfully");
+    if (!less_output) Serial.println("\nProgram loaded and verified successfully");
 }
 
 bool XenoVM::step() {
@@ -902,14 +912,15 @@ bool XenoVM::step() {
     return running;
 }
 
-void XenoVM::run() {
-    Serial.println("Starting Xeno VM...");
+void XenoVM::run(bool less_output) {
+    if (!less_output) Serial.println("\nStarting Xeno VM...");
+    Serial.println();
 
     while (step()) {
         // Continue execution
     }
-
-    Serial.println("Xeno VM finished");
+    Serial.println();
+    if (!less_output) Serial.println("Xeno VM finished");
 }
 
 void XenoVM::stop() {
@@ -925,7 +936,7 @@ uint32_t XenoVM::getInstructionCount() const { return instruction_count; }
 uint32_t XenoVM::getIterationCount() const { return iteration_count; }
 
 void XenoVM::dumpState() {
-    Serial.println("=== VM State ===");
+    Serial.println("\n=== VM State ===");
 
     Serial.print("Program Counter: ");
     Serial.println(program_counter);
@@ -933,9 +944,12 @@ void XenoVM::dumpState() {
     Serial.print("Stack Pointer: ");
     Serial.println(stack_pointer);
 
+    Serial.print("Max Stack Size: ");
+    Serial.println(max_stack_size);
+
     Serial.println("Stack: [");
 
-    for (int i = 0; i < stack_pointer && i < 10; ++i) {
+    for (uint32_t i = 0; i < stack_pointer && i < 10; ++i) {
         String type_str;
         String value_str;
         switch (stack[i].type) {
@@ -996,129 +1010,10 @@ void XenoVM::dumpState() {
         Serial.println(value_str);
     }
     Serial.println("}");
+    Serial.println();
 }
 
 void XenoVM::disassemble() {
-    Serial.println("=== Disassembly ===");
-    for (size_t i = 0; i < program.size(); ++i) {
-        const XenoInstruction& instr = program[i];
-        Serial.print(i);
-        Serial.print(": ");
-
-        switch (instr.opcode) {
-            case OP_NOP: Serial.println("NOP"); break;
-            case OP_PRINT:
-                Serial.print("PRINT ");
-                if (instr.arg1 < string_table.size()) {
-                    Serial.print("\"");
-                    Serial.print(string_table[instr.arg1]);
-                    Serial.print("\"");
-                } else {
-                    Serial.print("<invalid string>");
-                }
-                Serial.println();
-                break;
-            case OP_LED_ON:
-                Serial.print("LED_ON pin=");
-                Serial.println(instr.arg1);
-                break;
-            case OP_LED_OFF:
-                Serial.print("LED_OFF pin=");
-                Serial.println(instr.arg1);
-                break;
-            case OP_DELAY:
-                Serial.print("DELAY ");
-                Serial.print(instr.arg1);
-                Serial.println("ms");
-                break;
-            case OP_PUSH:
-                Serial.print("PUSH ");
-                Serial.println(instr.arg1);
-                break;
-            case OP_PUSH_FLOAT: {
-                float fval;
-                memcpy(&fval, &instr.arg1, sizeof(float));
-                Serial.print("PUSH_FLOAT ");
-                Serial.println(fval, 4);
-                break;
-            }
-            case OP_PUSH_BOOL:
-                Serial.print("PUSH_BOOL ");
-                Serial.println(instr.arg1 ? "true" : "false");
-                break;
-            case OP_PUSH_STRING:
-                Serial.print("PUSH_STRING ");
-                if (instr.arg1 < string_table.size()) {
-                    Serial.print("\"");
-                    Serial.print(string_table[instr.arg1]);
-                    Serial.print("\"");
-                } else {
-                    Serial.print("<invalid>");
-                }
-                Serial.println();
-                break;
-            case OP_POP: Serial.println("POP"); break;
-            case OP_ADD: Serial.println("ADD"); break;
-            case OP_SUB: Serial.println("SUB"); break;
-            case OP_MUL: Serial.println("MUL"); break;
-            case OP_DIV: Serial.println("DIV"); break;
-            case OP_MOD: Serial.println("MOD"); break;
-            case OP_ABS: Serial.println("ABS"); break;
-            case OP_POW: Serial.println("POW"); break;
-            case OP_MAX: Serial.println("MAX"); break;
-            case OP_MIN: Serial.println("MIN"); break;
-            case OP_SQRT: Serial.println("SQRT"); break;
-            case OP_INPUT:
-                Serial.print("INPUT ");
-                if (instr.arg1 < string_table.size()) {
-                    Serial.print(string_table[instr.arg1]);
-                } else {
-                    Serial.print("<invalid var>");
-                }
-                Serial.println();
-                break;
-            case OP_EQ: Serial.println("EQ"); break;
-            case OP_NEQ: Serial.println("NEQ"); break;
-            case OP_LT: Serial.println("LT"); break;
-            case OP_GT: Serial.println("GT"); break;
-            case OP_LTE: Serial.println("LTE"); break;
-            case OP_GTE: Serial.println("GTE"); break;
-            case OP_PRINT_NUM: Serial.println("PRINT_NUM"); break;
-            case OP_STORE:
-                Serial.print("STORE ");
-                if (instr.arg1 < string_table.size()) {
-                    Serial.print(string_table[instr.arg1]);
-                } else {
-                    Serial.print("<invalid var>");
-                }
-                Serial.println();
-                break;
-            case OP_LOAD:
-                Serial.print("LOAD ");
-                if (instr.arg1 < string_table.size()) {
-                    Serial.print(string_table[instr.arg1]);
-                } else {
-                    Serial.print("<invalid var>");
-                }
-                Serial.println();
-                break;
-            case OP_JUMP:
-                Serial.print("JUMP ");
-                Serial.println(instr.arg1);
-                break;
-            case OP_JUMP_IF:
-                Serial.print("JUMP_IF ");
-                Serial.println(instr.arg1);
-                break;
-            case OP_SIN: Serial.println("SIN"); break;
-            case OP_COS: Serial.println("COS"); break;
-            case OP_TAN: Serial.println("TAN"); break;
-            case OP_HALT: Serial.println("HALT"); break;
-            default:
-                Serial.print("UNKNOWN ");
-                Serial.println(instr.opcode);
-                break;
-        }
-    }
+    Debugger::disassemble(program, string_table, "Disassembly");
 }
 #undef String
