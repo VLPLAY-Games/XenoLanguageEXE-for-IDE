@@ -57,9 +57,7 @@ int main() {
     }
 
     std::ofstream infoFile(filePath, std::ios::trunc);
-    std::cout << 1;
     if (infoFile.is_open()) {
-        std::cout << 1;
         infoFile << "Language: " << (engine.getLanguageName() ? engine.getLanguageName() : "Unknown") << "\n";
         infoFile << "LanguageVersion: " << (engine.getLanguageVersion() ? engine.getLanguageVersion() : "Unknown") << "\n";
         infoFile << "LanguageDate: " << (engine.getLanguageDate() ? engine.getLanguageDate() : "Unknown") << "\n";
