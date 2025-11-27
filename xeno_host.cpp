@@ -48,8 +48,22 @@ int main() {
     std::mutex vmThreadMutex; // защита для vmThread
 
 
-    std::ofstream infoFile("xeno/xeno_info.txt", std::ios::trunc);
+    // Получаем путь к директории исполняемого файла
+    std::filesystem::path exePath = std::filesystem::current_path() / "xeno";
+    std::filesystem::path filePath;
+
+    // Проверяем существует ли папка xeno
+    if (std::filesystem::exists(exePath) && std::filesystem::is_directory(exePath)) {
+        filePath = exePath / "xeno_info.txt";
+    } else {
+        // Если папки нет - создаем файл рядом с исполняемым файлом
+        filePath = "xeno_info.txt";
+    }
+
+    std::ofstream infoFile(filePath, std::ios::trunc);
+    std::cout << 1;
     if (infoFile.is_open()) {
+        std::cout << 1;
         infoFile << "Language: " << (engine.getLanguageName() ? engine.getLanguageName() : "Unknown") << "\n";
         infoFile << "LanguageVersion: " << (engine.getLanguageVersion() ? engine.getLanguageVersion() : "Unknown") << "\n";
         infoFile << "LanguageDate: " << (engine.getLanguageDate() ? engine.getLanguageDate() : "Unknown") << "\n";
@@ -63,10 +77,18 @@ int main() {
         infoFile << "SUPPORT_DUMP_STATE\n";
         infoFile << "SUPPORT_SET_MAX_INSTRUCTIONS\n";
 
+        infoFile << "SUPPORT_MAX_STRING_LENGTH\n";
+        infoFile << "SUPPORT_MAX_VARIABLE_NAME\n";
+        infoFile << "SUPPORT_MAX_EXPRESSION_DEPTH\n";
+        infoFile << "SUPPORT_MAX_LOOP_DEPTH\n";
+        infoFile << "SUPPORT_MAX_IF_DEPTH\n";
+        infoFile << "SUPPORT_MAX_STACK_SIZE\n";
+        infoFile << "SUPPORT_ALLOWED_PINS\n";
+
         infoFile.close();
         
         try {
-            fs::permissions("xeno/xeno_info.txt",
+            fs::permissions(filePath,
                             fs::perms::owner_read |
                             fs::perms::group_read |
                             fs::perms::others_read,
