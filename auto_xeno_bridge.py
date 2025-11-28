@@ -43,8 +43,12 @@ def process_all_files(root_dir):
 def process_file(filepath):
     """Process a single file - convert Arduino includes to arduino_compat.h and handle String defines.
 
-    Important: this version removes any isInteger declaration/definition
-    (for both XenoVM and XenoCompiler) instead of commenting it out.
+    This version:
+      - removes any `#include <Arduino.h>` lines,
+      - does NOT strip directories from #include "..." (keeps xeno/...),
+      - removes isInteger declarations and definitions completely,
+      - replaces XenoVM::handleINPUT implementation if present,
+      - adds/maintains arduino_compat.h and String define/undef as before.
     """
     # Skip these files completely
     if filepath.endswith(('arduino_compat.cpp', 'xeno_host.cpp')):
@@ -60,11 +64,13 @@ def process_file(filepath):
         # Remove Arduino.h includes
         content = re.sub(r'#include\s*<Arduino\.h>\s*\n', '', content)
 
-        # Keep include paths intact (do NOT strip directory components from #include "...")
-
-        # Remove isInteger declarations/definitions entirely
+        # Remove isInteger declarations and definitions entirely
         content = remove_isInteger_declarations(content)
         content = remove_isInteger_definitions(content)
+
+        # Replace VM handleINPUT implementation if processing xeno_vm.cpp
+        if filepath.endswith('xeno_vm.cpp'):
+            content = replace_handleINPUT(content)
 
         if filepath.endswith('.h'):
             content = process_header_file(content)
@@ -89,9 +95,6 @@ def remove_isInteger_declarations(content):
     """Remove declaration lines like:
         bool isInteger(const String& str);
     that may appear inside class declarations or as standalone prototypes.
-
-    This uses a multiline regex to remove the full line. It tolerates an
-    optional leading qualifier such as `static` or `inline`.
     """
     decl_pattern = re.compile(
         r'^\s*(?:static\s+|inline\s+|virtual\s+|)?'  # optional qualifiers
@@ -100,8 +103,8 @@ def remove_isInteger_declarations(content):
     )
     new_content, n = decl_pattern.subn('', content)
     if n:
-        # Remove possible empty lines left behind
-        new_content = re.sub(r'\n{2,}', '\n\n', new_content)
+        # Collapse multiple blank lines to at most one empty line
+        new_content = re.sub(r'\n{3,}', '\n\n', new_content)
     return new_content
 
 def remove_isInteger_definitions(content):
@@ -109,8 +112,8 @@ def remove_isInteger_definitions(content):
         bool XenoVM::isInteger(...){...}
         bool XenoCompiler::isInteger(...){...}
 
-    Regex alone is fragile for nested braces, so we find the start with a
-    regex and then scan forward matching braces to find the real end.
+    We locate signature with a regex, then scan forward counting braces to find
+    the true end of the function body (to handle nested braces).
     """
     patterns = [
         r'bool\s+XenoVM::isInteger\s*\(',
@@ -123,29 +126,26 @@ def remove_isInteger_definitions(content):
             m = re.search(p, content[start_search_pos:])
             if not m:
                 break
-            # Calculate absolute start index of the match
             abs_start = start_search_pos + m.start()
-            # Find the opening parenthesis from abs_start
+            # find the '(' and then the opening '{'
             paren_pos = content.find('(', abs_start)
             if paren_pos == -1:
-                # malformed, bail out for this match
                 start_search_pos = abs_start + 1
                 continue
-
-            # Find the opening brace '{' that starts the function body
             brace_pos = content.find('{', paren_pos)
             if brace_pos == -1:
                 start_search_pos = abs_start + 1
                 continue
 
-            # Scan forward to find the matching closing brace
+            # scan for matching closing brace
             depth = 0
             i = brace_pos
             end_pos = None
             while i < len(content):
-                if content[i] == '{':
+                c = content[i]
+                if c == '{':
                     depth += 1
-                elif content[i] == '}':
+                elif c == '}':
                     depth -= 1
                     if depth == 0:
                         end_pos = i
@@ -153,25 +153,100 @@ def remove_isInteger_definitions(content):
                 i += 1
 
             if end_pos is None:
-                # Unbalanced braces; stop trying to remove further occurrences
+                # unbalanced - stop attempting further on this pattern
                 break
 
-            # Remove from start of function return type to end_pos (inclusive)
-            # Heuristic: find the previous line break before abs_start
+            # removal_start: try to remove full function signature line(s)
             line_start = content.rfind('\n', 0, abs_start)
             removal_start = line_start + 1 if line_start != -1 else abs_start
-            removal_end = end_pos + 1  # include the closing brace
+            removal_end = end_pos + 1  # include closing brace
 
-            # Perform the removal
+            # Remove the function definition
             content = content[:removal_start] + content[removal_end:]
 
-            # Continue searching after removal_start to find further matches
+            # continue searching from removal_start (content has changed)
             start_search_pos = removal_start
     return content
 
+def replace_handleINPUT(content):
+    """Replace implementation of:
+       void XenoVM::handleINPUT(const XenoInstruction& instr)
+    with the provided new implementation.
+    """
+    pattern = r'void\s+XenoVM::handleINPUT\s*\(\s*const\s+XenoInstruction\s*&\s*instr\s*\)\s*\{'
+    m = re.search(pattern, content)
+    if not m:
+        return content
+
+    abs_start = m.start()
+    brace_pos = content.find('{', m.end()-1)
+    if brace_pos == -1:
+        return content
+
+    # find matching closing brace
+    depth = 0
+    i = brace_pos
+    end_pos = None
+    while i < len(content):
+        if content[i] == '{':
+            depth += 1
+        elif content[i] == '}':
+            depth -= 1
+            if depth == 0:
+                end_pos = i
+                break
+        i += 1
+
+    if end_pos is None:
+        return content
+
+    # Include whole signature line(s)
+    line_start = content.rfind('\n', 0, abs_start)
+    removal_start = line_start + 1 if line_start != -1 else abs_start
+
+    replacement = '''void XenoVM::handleINPUT(const XenoInstruction& instr) {
+    if (instr.arg1 >= string_table.size()) {
+        Serial.println("ERROR: Invalid variable name index in INPUT");
+        running = false;
+        return;
+    }
+    String var_name = string_table[instr.arg1];
+    Serial.print("INPUT ");
+    Serial.print(var_name);
+    Serial.println(":");
+    const unsigned long TIMEOUT_MS = 30000;
+    XenoString raw = Serial.readStringTimeout(TIMEOUT_MS);
+    String input_str = raw;
+    input_str.trim();
+
+    if (input_str.isEmpty()) {
+        Serial.println("TIMEOUT - using default value 0");
+        variables[var_name] = XenoValue::makeInt(0);
+        return;
+    }
+    XenoString temp = input_str;
+    temp.trim();
+    XenoString lowered = temp.toLower();
+    XenoValue input_value;
+    if (isInteger(temp)) {
+        input_value = XenoValue::makeInt(temp.toInt());
+    } else if (isFloat(temp)) {
+        input_value = XenoValue::makeFloat(temp.toFloat());
+    } else if (lowered == "true" || lowered == "false") {
+        input_value = XenoValue::makeBool(lowered == "true");
+    } else {
+        input_value = XenoValue::makeString(addString(temp));
+    }
+    variables[var_name] = input_value;
+    Serial.print("-> ");
+    Serial.println(input_str);
+}'''
+
+    new_content = content[:removal_start] + replacement + content[end_pos+1:]
+    return new_content
+
 def process_header_file(content):
     """Process .h file - add arduino_compat.h include and String defines."""
-    # Add arduino_compat.h and String define after all includes within guard macros
     if '#include "arduino_compat.h"' not in content:
         lines = content.splitlines()
         in_guard = False
@@ -210,7 +285,6 @@ def process_header_file(content):
 
 def process_cpp_file(content):
     """Process .cpp file - add String defines after includes."""
-    # Add String define after all includes
     if '#define String XenoString' not in content:
         includes_pattern = r'((?:#include[^\n]+\n)+)'
         match = re.search(includes_pattern, content)
@@ -230,7 +304,6 @@ def process_cpp_file(content):
         content = content.rstrip() + '\n#undef String\n'
 
     return content
-
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
