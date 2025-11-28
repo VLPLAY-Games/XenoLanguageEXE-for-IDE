@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef SRC_XENO_XENO_VM_H_
-#define SRC_XENO_XENO_VM_H_
+#ifndef SRC_XENO_MAIN_XENO_VM_H_
+#define SRC_XENO_MAIN_XENO_VM_H_
 
 #include <vector>
 #include <map>
 #include <stack>
-#include "xeno_common.h"
-#include "xeno_security.h"
-#include "xeno_security_config.h"
+#include "../xeno_common.h"
+#include "../security/xeno_security.h"
+#include "../security/xeno_security_config.h"
 #include "arduino_compat.h"
 #define String XenoString
 
@@ -79,7 +79,7 @@ class XenoVM {
     XenoValue performAbs(const XenoValue& a);
     bool performComparison(const XenoValue& a, const XenoValue& b, uint8_t op);
     uint16_t addString(const String& str);
-    // // bool isInteger(const String& str);
+
     bool isFloat(const String& str);
     bool isBool(const String& str);
     void handleNOP(const XenoInstruction& instr);

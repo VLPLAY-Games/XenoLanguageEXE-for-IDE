@@ -105,5 +105,4 @@ struct LoopInfo {
     int end_jump_address;
 };
 
-#undef String
 #endif  // SRC_XENO_XENO_COMMON_H_

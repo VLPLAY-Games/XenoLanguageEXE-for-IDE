@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef SRC_XENO_XENO_SECURITY_H_
-#define SRC_XENO_XENO_SECURITY_H_
+#ifndef SRC_XENO_SECURITY_XENO_SECURITY_H_
+#define SRC_XENO_SECURITY_XENO_SECURITY_H_
 
 #include <vector>
-#include "xeno_common.h"
+#include "../xeno_common.h"
 #include "xeno_security_config.h"
 #include "arduino_compat.h"
 #define String XenoString
@@ -42,4 +42,4 @@ class XenoSecurity {
 };
 
 #undef String
-#endif  // SRC_XENO_XENO_SECURITY_H_
+#endif  // SRC_XENO_SECURITY_XENO_SECURITY_H_

@@ -3,11 +3,25 @@ import re
 import sys
 
 def process_all_files(root_dir):
-    """Process all .h and .cpp files in the directory tree."""
+    """Process all .h and .cpp files under the project's src/ directory.
+
+    This script requires that a `src/` directory exists inside the provided
+    `root_dir`. If `src/` is missing the script will print an error and
+    return False (exit code 1 when run as __main__).
+    """
+    src_root = os.path.join(root_dir, 'src')
+    if not os.path.isdir(src_root):
+        print(f"ERROR: Required directory not found: {os.path.abspath(src_root)}")
+        print("Please make sure your project contains a 'src/' directory and run again.")
+        return False
+
+    walk_root = src_root
+    print(f"Processing files under: {os.path.abspath(walk_root)}")
+
     processed_count = 0
     error_count = 0
-    
-    for root, dirs, files in os.walk(root_dir):
+
+    for root, dirs, files in os.walk(walk_root):
         for file in files:
             if file.endswith(('.h', '.cpp')) and file != 'arduino_compat.h':
                 filepath = os.path.join(root, file)
@@ -19,47 +33,44 @@ def process_all_files(root_dir):
                 except Exception as e:
                     print(f"ERROR processing {filepath}: {str(e)}")
                     error_count += 1
-    
+
     print(f"\nProcessing completed:")
     print(f"  Successfully processed: {processed_count} files")
     print(f"  Errors: {error_count} files")
-    
+
     return error_count == 0
 
 def process_file(filepath):
-    """Process a single file - convert Arduino includes to arduino_compat.h and handle String defines."""
+    """Process a single file - convert Arduino includes to arduino_compat.h and handle String defines.
+
+    Important: this version removes any isInteger declaration/definition
+    (for both XenoVM and XenoCompiler) instead of commenting it out.
+    """
     # Skip these files completely
     if filepath.endswith(('arduino_compat.cpp', 'xeno_host.cpp')):
         print(f"SKIPPED: {filepath}")
         return True
-        
+
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         original_content = content
-        
+
         # Remove Arduino.h includes
         content = re.sub(r'#include\s*<Arduino\.h>\s*\n', '', content)
-        
-        # Remove paths from includes, keep only filename
-        content = re.sub(
-            r'#include\s*"([^"/]*/)*([^"]+)"',
-            r'#include "\2"',
-            content
-        )
-        
-        # Comment out isInteger functions in specific files
-        if filepath.endswith(('xeno_compiler.h', 'xeno_vm.h')):
-            content = comment_isInteger_declaration(content)
-        elif filepath.endswith(('xeno_compiler.cpp', 'xeno_vm.cpp')):
-            content = comment_isInteger_definition(content)
-        
+
+        # Keep include paths intact (do NOT strip directory components from #include "...")
+
+        # Remove isInteger declarations/definitions entirely
+        content = remove_isInteger_declarations(content)
+        content = remove_isInteger_definitions(content)
+
         if filepath.endswith('.h'):
             content = process_header_file(content)
         elif filepath.endswith('.cpp'):
             content = process_cpp_file(content)
-        
+
         # Only write if content changed
         if content != original_content:
             with open(filepath, 'w', encoding='utf-8') as f:
@@ -69,60 +80,93 @@ def process_file(filepath):
         else:
             print(f"NO CHANGES: {filepath}")
             return True
-            
+
     except Exception as e:
         print(f"ERROR: Failed to process {filepath} - {str(e)}")
         return False
 
-def comment_isInteger_declaration(content):
-    """Comment out isInteger function declaration in header files."""
-    # Pattern to find bool isInteger(const String& str);
-    pattern = r'bool\s+isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*;'
-    
-    # Replace with commented version
-    replacement = r'// bool isInteger(const String& str);'
-    content = re.sub(pattern, replacement, content)
-    
-    return content
+def remove_isInteger_declarations(content):
+    """Remove declaration lines like:
+        bool isInteger(const String& str);
+    that may appear inside class declarations or as standalone prototypes.
 
-def comment_isInteger_definition(content):
-    """Comment out isInteger function definition in cpp files."""
-    # Improved patterns to capture the complete function definitions
-    vm_pattern = r'bool\s+XenoVM::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{[^}]+\}'
-    compiler_pattern = r'bool\s+XenoCompiler::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{[^}]+\}[^}]*\}'
-    
-    # More specific patterns that capture everything between the braces
-    vm_complete_pattern = r'(bool\s+XenoVM::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{)(.*?)(\n\s*\})'
-    compiler_complete_pattern = r'(bool\s+XenoCompiler::isInteger\s*\(\s*const\s+String\s*&\s*str\s*\)\s*\{)(.*?)(\n\s*\})'
-    
-    # Try the complete patterns first
-    vm_replacement = '''// bool XenoVM::isInteger(const String& str) {
-//     if (str.isEmpty()) return false;
-//     const char* cstr = str.c_str();
-//     size_t start = 0;
-//     if (cstr[0] == '-') start = 1;
-//     for (size_t i = start; i < str.length(); ++i) {
-//         if (!isdigit(cstr[i])) return false;
-//     }
-//     return true;
-// }'''
-    
-    compiler_replacement = '''// bool XenoCompiler::isInteger(const String& str) {
-//     if (str.isEmpty()) return false;
-//     const char* cstr = str.c_str();
-//     size_t start = 0;
-//     if (cstr[0] == '-') start = 1;
-//     for (size_t i = start; i < str.length(); ++i) {
-//         if (!isdigit(cstr[i])) return false;
-//     }
-//     long long_val = str.toInt();
-//     return !(long_val > 2147483647L || long_val < -2147483648L);
-// }'''
-    
-    # Apply replacements using the complete patterns
-    content = re.sub(compiler_complete_pattern, compiler_replacement, content, flags=re.DOTALL)
-    content = re.sub(vm_complete_pattern, vm_replacement, content, flags=re.DOTALL)
-    
+    This uses a multiline regex to remove the full line. It tolerates an
+    optional leading qualifier such as `static` or `inline`.
+    """
+    decl_pattern = re.compile(
+        r'^\s*(?:static\s+|inline\s+|virtual\s+|)?'  # optional qualifiers
+        r'bool\s+isInteger\s*\(\s*const\s+String\s*&\s*\w*\s*\)\s*;\s*$',
+        flags=re.MULTILINE
+    )
+    new_content, n = decl_pattern.subn('', content)
+    if n:
+        # Remove possible empty lines left behind
+        new_content = re.sub(r'\n{2,}', '\n\n', new_content)
+    return new_content
+
+def remove_isInteger_definitions(content):
+    """Remove full function definitions for:
+        bool XenoVM::isInteger(...){...}
+        bool XenoCompiler::isInteger(...){...}
+
+    Regex alone is fragile for nested braces, so we find the start with a
+    regex and then scan forward matching braces to find the real end.
+    """
+    patterns = [
+        r'bool\s+XenoVM::isInteger\s*\(',
+        r'bool\s+XenoCompiler::isInteger\s*\('
+    ]
+
+    for p in patterns:
+        start_search_pos = 0
+        while True:
+            m = re.search(p, content[start_search_pos:])
+            if not m:
+                break
+            # Calculate absolute start index of the match
+            abs_start = start_search_pos + m.start()
+            # Find the opening parenthesis from abs_start
+            paren_pos = content.find('(', abs_start)
+            if paren_pos == -1:
+                # malformed, bail out for this match
+                start_search_pos = abs_start + 1
+                continue
+
+            # Find the opening brace '{' that starts the function body
+            brace_pos = content.find('{', paren_pos)
+            if brace_pos == -1:
+                start_search_pos = abs_start + 1
+                continue
+
+            # Scan forward to find the matching closing brace
+            depth = 0
+            i = brace_pos
+            end_pos = None
+            while i < len(content):
+                if content[i] == '{':
+                    depth += 1
+                elif content[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end_pos = i
+                        break
+                i += 1
+
+            if end_pos is None:
+                # Unbalanced braces; stop trying to remove further occurrences
+                break
+
+            # Remove from start of function return type to end_pos (inclusive)
+            # Heuristic: find the previous line break before abs_start
+            line_start = content.rfind('\n', 0, abs_start)
+            removal_start = line_start + 1 if line_start != -1 else abs_start
+            removal_end = end_pos + 1  # include the closing brace
+
+            # Perform the removal
+            content = content[:removal_start] + content[removal_end:]
+
+            # Continue searching after removal_start to find further matches
+            start_search_pos = removal_start
     return content
 
 def process_header_file(content):
@@ -132,7 +176,7 @@ def process_header_file(content):
         lines = content.splitlines()
         in_guard = False
         last_include_line = -1
-        
+
         for i, line in enumerate(lines):
             if line.strip().startswith('#ifndef') or line.strip().startswith('#define'):
                 in_guard = True
@@ -140,7 +184,7 @@ def process_header_file(content):
                 last_include_line = i
             elif in_guard and line.strip() and not line.strip().startswith('#'):
                 break
-        
+
         if last_include_line != -1:
             lines.insert(last_include_line + 1, '#include "arduino_compat.h"')
             lines.insert(last_include_line + 2, '#define String XenoString')
@@ -150,9 +194,9 @@ def process_header_file(content):
             replacement = r'\1#include "arduino_compat.h"\n#define String XenoString\n\n'
             content = re.sub(ifndef_pattern, replacement, content)
             return content
-        
+
         content = '\n'.join(lines)
-    
+
     # Add #undef String before last #endif
     if '#undef String' not in content:
         lines = content.splitlines()
@@ -161,7 +205,7 @@ def process_header_file(content):
                 lines.insert(i, '#undef String')
                 content = '\n'.join(lines)
                 break
-    
+
     return content
 
 def process_cpp_file(content):
@@ -170,7 +214,7 @@ def process_cpp_file(content):
     if '#define String XenoString' not in content:
         includes_pattern = r'((?:#include[^\n]+\n)+)'
         match = re.search(includes_pattern, content)
-        
+
         if match:
             end_pos = match.end()
             content = content[:end_pos] + '#define String XenoString\n' + content[end_pos:]
@@ -180,27 +224,28 @@ def process_cpp_file(content):
                 insert_pos = content.find('\n', license_end) + 1
                 if insert_pos > 0:
                     content = content[:insert_pos] + '#define String XenoString\n' + content[insert_pos:]
-    
+
     # Add #undef String at end of file
     if '#undef String' not in content:
         content = content.rstrip() + '\n#undef String\n'
-    
+
     return content
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         project_path = sys.argv[1]
     else:
         project_path = "."
-    
-    print("Starting Arduino to arduino_compat.h conversion...")
-    print(f"Processing directory: {os.path.abspath(project_path)}")
-    
+
+    print("Starting Arduino to arduino_compat.h conversion (src/ required)...")
+    print(f"Project root: {os.path.abspath(project_path)}")
+
     success = process_all_files(project_path)
-    
+
     if success:
         print("\nAll files processed successfully!")
         sys.exit(0)
     else:
-        print("\nSome files had errors during processing!")
+        print("\nProcessing failed (see messages above). Ensure 'src/' exists and fix any file errors.")
         sys.exit(1)

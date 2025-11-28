@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef SRC_XENO_XENO_COMPILER_H_
-#define SRC_XENO_XENO_COMPILER_H_
+#ifndef SRC_XENO_MAIN_XENO_COMPILER_H_
+#define SRC_XENO_MAIN_XENO_COMPILER_H_
 
 #include <vector>
 #include <map>
 #include <stack>
 #include <algorithm>
-#include "xeno_common.h"
-#include "xeno_security.h"
+#include "../xeno_common.h"
+#include "../security/xeno_security.h"
 #include "arduino_compat.h"
 #define String XenoString
 
@@ -73,7 +73,7 @@ class XenoCompiler {
     String cleanLine(const String& line);
     int addString(const String& str);
     int getVariableIndex(const String& var_name);
-    // // bool isInteger(const String& str);
+
     bool isFloat(const String& str);
     bool isBool(const String& str);
     bool isQuotedString(const String& str);

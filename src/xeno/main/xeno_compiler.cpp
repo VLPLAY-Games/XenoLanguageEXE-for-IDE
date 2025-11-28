@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <vector>
 #include "xeno_compiler.h"
-#include "xeno_debug_tools.h"
+#include "../debug/xeno_debug_tools.h"
 #define String XenoString
 
 
@@ -186,17 +186,7 @@ int XenoCompiler::getVariableIndex(const String& var_name) {
     return validateVariableName(var_name) ? addString(var_name) : 0;
 }
 
-// // bool XenoCompiler::isInteger(const String& str) {
-//     if (str.isEmpty()) return false;
-//     const char* cstr = str.c_str();
-//     size_t start = 0;
-//     if (cstr[0] == '-') start = 1;
-//     for (size_t i = start; i < str.length(); ++i) {
-//         if (!isdigit(cstr[i])) return false;
-//     }
-//     long long_val = str.toInt();
-//     return !(long_val > 2147483647L || long_val < -2147483648L);
-// }
+
 
 bool XenoCompiler::isFloat(const String& str) {
     if (str.isEmpty() || str.length() > 32) return false;

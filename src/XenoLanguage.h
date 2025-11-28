@@ -18,9 +18,9 @@
 #define SRC_XENOLANGUAGE_H_
 
 #include <vector>
-#include "xeno_compiler.h"
-#include "xeno_vm.h"
-#include "xeno_security_config.h"
+#include "xeno/main/xeno_compiler.h"
+#include "xeno/main/xeno_vm.h"
+#include "xeno/security/xeno_security_config.h"
 #include "arduino_compat.h"
 #define String XenoString
 
@@ -32,8 +32,11 @@ class XenoLanguage {
     static constexpr const char* xeno_language_name = "Xeno Language";
 
     XenoSecurityConfig security_config;
-    XenoCompiler compiler;
-    XenoVM vm;
+
+    XenoCompiler* compiler = new XenoCompiler(security_config);
+    XenoVM* vm = new XenoVM(security_config);
+
+    void recreateObjects();
 
  public:
     XenoLanguage();

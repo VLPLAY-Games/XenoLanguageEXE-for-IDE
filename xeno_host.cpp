@@ -14,7 +14,7 @@
 #include <cstring>
 #include <fstream>
 #include <filesystem>
-#include "XenoLanguage.h"
+#include "src/XenoLanguage.h"
 
 namespace fs = std::filesystem;
 static uint32_t g_max_instructions = 100000;

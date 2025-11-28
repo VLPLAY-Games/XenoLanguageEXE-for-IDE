@@ -18,7 +18,7 @@
 #include <limits>
 #include <vector>
 #include "xeno_vm.h"
-#include "xeno_debug_tools.h"
+#include "../debug/xeno_debug_tools.h"
 #define String XenoString
 
 void XenoVM::initializeDispatchTable() {
@@ -514,16 +514,7 @@ uint16_t XenoVM::addString(const String& str) {
     return new_index;
 }
 
-// // bool XenoVM::isInteger(const String& str) {
-//     if (str.isEmpty()) return false;
-//     const char* cstr = str.c_str();
-//     size_t start = 0;
-//     if (cstr[0] == '-') start = 1;
-//     for (size_t i = start; i < str.length(); ++i) {
-//         if (!isdigit(cstr[i])) return false;
-//     }
-//     return true;
-// }
+
 
 bool XenoVM::isFloat(const String& str) {
     if (str.isEmpty()) return false;
@@ -695,17 +686,21 @@ void XenoVM::handleINPUT(const XenoInstruction& instr) {
     }
 
     String var_name = string_table[instr.arg1];
-
-    // Печатаем приглашение и делаем перевод строки, чтобы IDE получил событие OutputDataReceived
     Serial.print("INPUT ");
     Serial.print(var_name);
-    Serial.println(":"); // <-- здесь '\n' и flush через SerialClass
+    Serial.print(": ");
 
-    // Ждём входа блокирующе, но не дольше 30000 мс
-    const unsigned long TIMEOUT_MS = 30000;
-    XenoString raw = Serial.readStringTimeout(TIMEOUT_MS);
-    String input_str = raw;
-    input_str.trim();
+    unsigned long startTime = millis();
+    String input_str = "";
+
+    while (millis() - startTime < 30000) {
+        if (Serial.available() > 0) {
+            input_str = Serial.readString();
+            input_str.trim();
+            break;
+        }
+        delay(100);
+    }
 
     if (input_str.isEmpty()) {
         Serial.println("TIMEOUT - using default value 0");
@@ -713,19 +708,15 @@ void XenoVM::handleINPUT(const XenoInstruction& instr) {
         return;
     }
 
-    XenoString temp = input_str;
-    temp.trim();
-    XenoString lowered = temp.toLower();
-
     XenoValue input_value;
-    if (isInteger(temp)) {
-        input_value = XenoValue::makeInt(temp.toInt());
-    } else if (isFloat(temp)) {
-        input_value = XenoValue::makeFloat(temp.toFloat());
-    } else if (lowered == "true" || lowered == "false") {
-        input_value = XenoValue::makeBool(lowered == "true");
+    if (isInteger(input_str)) {
+        input_value = XenoValue::makeInt(input_str.toInt());
+    } else if (isFloat(input_str)) {
+        input_value = XenoValue::makeFloat(input_str.toFloat());
+    } else if (isBool(input_str)) {
+        input_value = XenoValue::makeBool(input_str == "true");
     } else {
-        input_value = XenoValue::makeString(addString(temp));
+        input_value = XenoValue::makeString(addString(input_str));
     }
 
     variables[var_name] = input_value;

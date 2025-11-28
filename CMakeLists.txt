@@ -7,13 +7,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(SOURCES
     arduino_compat.cpp
-    xeno_debug_tools.cpp
-    xeno_compiler.cpp
-    xeno_vm.cpp
-    xeno_security_config.cpp
-    xeno_security.cpp
-    xeno_common.cpp
-    XenoLanguage.cpp
+    src/xeno/debug/xeno_debug_tools.cpp
+    src/xeno/main/xeno_compiler.cpp
+    src/xeno/main/xeno_vm.cpp
+    src/xeno/security/xeno_security_config.cpp
+    src/xeno/security/xeno_security.cpp
+    src/xeno/xeno_common.cpp
+    src/XenoLanguage.cpp
     xeno_host.cpp
     version.rc
 )
