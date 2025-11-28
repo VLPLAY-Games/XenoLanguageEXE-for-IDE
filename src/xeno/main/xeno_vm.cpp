@@ -687,7 +687,7 @@ void XenoVM::handleINPUT(const XenoInstruction& instr) {
     String var_name = string_table[instr.arg1];
     Serial.print("INPUT ");
     Serial.print(var_name);
-    Serial.println(":"); // <-- здесь '\n' и flush через SerialClass
+    Serial.println(":");
     const unsigned long TIMEOUT_MS = 30000;
     XenoString raw = Serial.readStringTimeout(TIMEOUT_MS);
     String input_str = raw;
