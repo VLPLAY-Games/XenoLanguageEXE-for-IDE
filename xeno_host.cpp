@@ -2,7 +2,6 @@
 // cmake .. -G "Visual Studio 17 2022" -A x64
 // cmake --build . --config Release
 
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -150,15 +149,14 @@ int main() {
                         if (vmThread.joinable()) {
                             try { vmThread.join(); } catch(...) {}
                         }
-                        // УБРАЛИ &g_max_instructions из списка захвата.
                         vmThread = std::thread([&engine, &vm_running, &send_line]() {
                             try {
-                                // глоабльная g_max_instructions доступна здесь без захвата
                                 engine.setMaxInstructions(g_max_instructions);
                                 bool ok = engine.run();
                                 if (!ok) {
                                     send_line("Failed to start virtual machine");
                                 }
+                                send_line("=== Execution completed ===");
                             } catch (const std::exception& ex) {
                                 send_line(std::string("Runtime error: ") + ex.what());
                             } catch (...) {
@@ -179,11 +177,8 @@ int main() {
 
         else if (cmd == "STOP") {
             try {
-                // Остановим VM; engine.stop() должен корректно разбудить/прервать engine.run()
                 engine.stop();
                 vm_running = false;
-
-                // Подождём завершения фонового потока
                 {
                     std::lock_guard<std::mutex> lk(vmThreadMutex);
                     if (vmThread.joinable()) {
@@ -238,7 +233,7 @@ int main() {
         else if (cmd == "PRINT_COMPILED_CODE") {
             try {
                 engine.printCompiledCode();
-                send_line("Compiled code printed");
+                // send_line("Compiled code printed");
             } catch (const std::exception& ex) {
                 send_line(std::string("Error printing compiled code: ") + ex.what());
             } catch (...) {
@@ -248,7 +243,7 @@ int main() {
         else if (cmd == "DISASSEMBLE") {
             try {
                 engine.disassemble();
-                send_line("Disassembly completed");
+                // send_line("Disassembly completed");
             } catch (const std::exception& ex) {
                 send_line(std::string("Error during disassembly: ") + ex.what());
             } catch (...) {
@@ -258,7 +253,7 @@ int main() {
         else if (cmd == "DUMP_STATE") {
             try {
                 engine.dumpState();
-                send_line("VM state dumped");
+                // send_line("VM state dumped");
             } catch (const std::exception& ex) {
                 send_line(std::string("Error dumping VM state: ") + ex.what());
             } catch (...) {
@@ -268,7 +263,7 @@ int main() {
         else if (cmd == "STEP") {
             try {
                 engine.step();
-                send_line("Executed one step");
+                // send_line("Executed one step");
             } catch (const std::exception& ex) {
                 send_line(std::string("Error executing step: ") + ex.what());
             } catch (...) {
@@ -291,7 +286,7 @@ int main() {
                 try {
                     g_max_instructions = std::stoul(value);
                     engine.setMaxInstructions(g_max_instructions);
-                    send_line("Max instructions set to " + value);
+                    // send_line("Max instructions set to " + value);
                 } catch (...) {
                     send_line("Invalid value for max instructions");
                 }
@@ -299,13 +294,144 @@ int main() {
                 send_line("Missing value for max instructions");
             }
         }
+        else if (cmd == "SET_MAX_STRING_LIMIT") {
+            std::string value;
+            if (std::getline(std::cin, value)) {
+                try {
+                    uint16_t length = std::stoul(value);
+                    bool success = engine.setStringLimit(length);
+                    if (success) {
+                        // send_line("String length limit set to " + value);
+                    } else {
+                        send_line("Failed to set string length limit");
+                    }
+                } catch (...) {
+                    send_line("Invalid value for string length limit");
+                }
+            } else {
+                send_line("Missing value for string length limit");
+            }
+        }
+        else if (cmd == "SET_MAX_VARIABLE_NAME_LIMIT") {
+            std::string value;
+            if (std::getline(std::cin, value)) {
+                try {
+                    uint16_t length = std::stoul(value);
+                    bool success = engine.setVariableNameLimit(length);
+                    if (success) {
+                        // send_line("Variable name length limit set to " + value);
+                    } else {
+                        send_line("Failed to set variable name length limit");
+                    }
+                } catch (...) {
+                    send_line("Invalid value for variable name length limit");
+                }
+            } else {
+                send_line("Missing value for variable name length limit");
+            }
+        }
+        else if (cmd == "SET_MAX_EXPRESSION_DEPTH") {
+            std::string value;
+            if (std::getline(std::cin, value)) {
+                try {
+                    uint16_t depth = std::stoul(value);
+                    bool success = engine.setExpressionDepth(depth);
+                    if (success) {
+                        // send_line("Expression depth limit set to " + value);
+                    } else {
+                        send_line("Failed to set expression depth limit");
+                    }
+                } catch (...) {
+                    send_line("Invalid value for expression depth limit");
+                }
+            } else {
+                send_line("Missing value for expression depth limit");
+            }
+        }
+        else if (cmd == "SET_MAX_LOOP_DEPTH") {
+            std::string value;
+            if (std::getline(std::cin, value)) {
+                try {
+                    uint16_t depth = std::stoul(value);
+                    bool success = engine.setLoopDepth(depth);
+                    if (success) {
+                        // send_line("Loop depth limit set to " + value);
+                    } else {
+                        send_line("Failed to set loop depth limit");
+                    }
+                } catch (...) {
+                    send_line("Invalid value for loop depth limit");
+                }
+            } else {
+                send_line("Missing value for loop depth limit");
+            }
+        }
+        else if (cmd == "SET_MAX_IF_DEPTH") {
+            std::string value;
+            if (std::getline(std::cin, value)) {
+                try {
+                    uint16_t depth = std::stoul(value);
+                    bool success = engine.setIfDepth(depth);
+                    if (success) {
+                        // send_line("If depth limit set to " + value);
+                    } else {
+                        send_line("Failed to set if depth limit");
+                    }
+                } catch (...) {
+                    send_line("Invalid value for if depth limit");
+                }
+            } else {
+                send_line("Missing value for if depth limit");
+            }
+        }
+        else if (cmd == "SET_MAX_STACK_SIZE") {
+            std::string value;
+            if (std::getline(std::cin, value)) {
+                try {
+                    uint16_t size = std::stoul(value);
+                    bool success = engine.setStackSize(size);
+                    if (success) {
+                        // send_line("Stack size limit set to " + value);
+                    } else {
+                        send_line("Failed to set stack size limit");
+                    }
+                } catch (...) {
+                    send_line("Invalid value for stack size limit");
+                }
+            } else {
+                send_line("Missing value for stack size limit");
+            }
+        }
+        else if (cmd == "SET_ALLOWED_PINS") {
+            std::string pinList;
+            if (std::getline(std::cin, pinList)) {
+                try {
+                    std::vector<uint8_t> pins;
+                    std::stringstream ss(pinList);
+                    std::string pinStr;
+                    
+                    while (std::getline(ss, pinStr, ',')) {
+                        pins.push_back(static_cast<uint8_t>(std::stoul(pinStr)));
+                    }
+                    
+                    bool success = engine.setAllowedPins(pins);
+                    if (success) {
+                        // send_line("Allowed pins set to: " + pinList);
+                    } else {
+                        send_line("Failed to set allowed pins");
+                    }
+                } catch (...) {
+                    send_line("Invalid pin list format. Use: pin1,pin2,pin3");
+                }
+            } else {
+                send_line("Missing pin list");
+            }
+        }
         else if (cmd == "EXIT") {
             send_line("Exiting");
-            // остановим VM, если запущена
             try {
                 engine.stop();
             } catch(...) {}
-            // дождёмся потока
             {
                 std::lock_guard<std::mutex> lk(vmThreadMutex);
                 if (vmThread.joinable()) {
@@ -315,14 +441,13 @@ int main() {
             running = false;
             break;
         }
-        else if (cmd.rfind("STDIN ", 0) == 0) { // starts_with "STDIN "
-            std::string payload = cmd.substr(6); // всё после "STDIN "
-            SerialPushInput(payload); // кладём в очередь Serial (см arduino_compat)
+        else if (cmd.rfind("STDIN ", 0) == 0) {
+            std::string payload = cmd.substr(6);
+            SerialPushInput(payload);
         }
         else {
             send_line(std::string("Unknown command: ") + cmd);
         }
-
     }
 
     try { engine.stop(); } catch(...) {}
