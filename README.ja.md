@@ -1,5 +1,7 @@
 # Xeno Language EXE for Windows IDE
 
+[English](README.md) | [日本語](README.ja.md) | [Русский](README.ru.md)
+
 ## 🏗️ プロジェクト概要
 
 このリポジトリは、**Xeno IDE**で使用するために特別に設計されたXenoプログラミング言語のWindows実行可能ファイル版を提供します。ArduinoベースのXenoコードがWindowsシステムでネイティブに実行できる互換性ブリッジを作成します。
@@ -61,6 +63,15 @@ cmake --build build --config Release
 
 出力: build/Release/xeno_host.exe
 ```
+Windowsユーザーの場合、CMakeを手動で実行しなくても、自動で実行ファイルをビルドできます：
+
+1. CMake がインストールされ、PATH に追加されていることを確認してください  
+2. **auto_build_exe.bat** を実行します  
+3. このスクリプトは次の処理を行います:  
+   - プロジェクトを自動的にコンフィグ・ビルド  
+   - **/build/** フォルダに *xeno_host.exe* を生成  
+   - 中間生成物フォルダを削除し、xeno_host.exe のみが見える状態に整理  
+
 ## 🔄 Xeno IDEとの統合
 
 Xeno IDEはこのリポジトリのリリースから`xeno_host.exe`を自動的にダウンロードして使用します。統合プロセス:

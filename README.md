@@ -1,5 +1,7 @@
 # Xeno Language EXE for Windows IDE
 
+[English](README.md) | [日本語](README.ja.md) | [Русский](README.ru.md)
+
 ## 🏗️ Project Overview
 
 This repository provides the Windows executable version of the Xeno programming language, specifically designed for use with the **Xeno IDE**. It creates a compatibility bridge that allows Arduino-based Xeno code to run natively on Windows systems.
@@ -41,7 +43,7 @@ XenoLanguageEXE-for-IDE/
 ├── xeno_host.cpp # Main executable source
 ├── CMakeLists.txt # Build configuration
 ├── version.rc # Version resource file
-└── Xeno Language Main Files
+└── src/ # Xeno Language Main Files
 ```
 
 
@@ -62,6 +64,15 @@ cmake --build build --config Release
 
 Output: build/Release/xeno_host.exe
 ```
+For Windows users, you can build the executable automatically without manually running CMake:
+
+1. Make sure CMake is installed and added to PATH
+2. Run auto_build_exe.bat
+3. The script will:
+   - Configure and build the project
+   - Create xeno_host.exe inside /build/
+   - Remove intermediate folders so only xeno_host.exe remains visible
+
 ## 🔄 Integration with Xeno IDE
 
 Xeno IDE automatically downloads and uses `xeno_host.exe` from this repository's releases. The integration process:
