@@ -79,16 +79,6 @@ int main() {
         infoFile << "SUPPORT_ALLOWED_PINS\n";
 
         infoFile.close();
-        
-        try {
-            fs::permissions(filePath,
-                            fs::perms::owner_read |
-                            fs::perms::group_read |
-                            fs::perms::others_read,
-                            fs::perm_options::replace);
-        } catch (const std::exception& e) {
-            std::cerr << "Failed to set read-only permissions: " << e.what() << std::endl;
-        }
     }
 
     auto send_line = [](const std::string& s) {
